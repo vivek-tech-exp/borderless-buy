@@ -20,6 +20,7 @@ export default function MainDashboard() {
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
   const [lastPrompt, setLastPrompt] = useState<string | null>(null);
   const [showPromptModal, setShowPromptModal] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
   const { convertToPreferred, preferredCurrency } = useCurrency();
 
@@ -163,13 +164,22 @@ export default function MainDashboard() {
             </button>
           </div>
           <div className="shrink-0 flex items-center gap-3">
-            <AuthForm />
+            <AuthForm onUserChange={setUser} />
             <div className="sm:w-40">
               <CurrencySetting />
             </div>
           </div>
         </div>
       </header>
+
+      {items.length > 0 && !user && (
+        <section className="mb-6 rounded-lg border border-amber-900 bg-amber-950/50 p-4">
+          <p className="text-sm text-amber-100">
+            <span className="font-medium">💡 Tip:</span> Your items are currently saved in browser memory only. 
+            Sign in with your email to persist them permanently!
+          </p>
+        </section>
+      )}
 
       <section className="mb-8">
         <AddItemForm onAdd={handleAdd} />

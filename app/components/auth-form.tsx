@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabase";
 
-export function AuthForm() {
+export function AuthForm({ onUserChange }: { onUserChange?: (user: any) => void } = {}) {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -14,19 +14,23 @@ export function AuthForm() {
     async function init() {
       const { data } = await supabase.auth.getSession();
       if (!mounted) return;
-      setUser(data.session?.user ?? null);
+      const currentUser = data.session?.user ?? null;
+      setUser(currentUser);
+      onUserChange?.(currentUser);
     }
     init();
 
     const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      onUserChange?.(currentUser);
     });
 
     return () => {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, []);
+  }, [onUserChange]);
 
   async function signIn() {
     if (!email) return setMessage("Enter an email address");

@@ -55,6 +55,9 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
       {error && (
         <p className="text-sm text-red-400 col-span-full mt-0.5">{error}</p>
       )}
+      <p className="text-xs text-zinc-500 col-span-full">
+        ✨ Add items here. Sign in to save them permanently.
+      </p>
     </form>
   );
 }
