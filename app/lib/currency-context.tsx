@@ -8,7 +8,8 @@ import {
   useEffect,
   type ReactNode,
 } from "react";
-import type { CurrencyCode } from "@/types";
+import type { CurrencyCode, CountryCode } from "@/types";
+import { COUNTRY_CURRENCY, COUNTRY_CODES } from "@/types";
 import { convert, formatCurrency } from "@/app/lib/utils";
 import { PREFERRED_CURRENCY_KEY } from "@/app/lib/constants";
 
@@ -19,8 +20,9 @@ interface RatesState {
 }
 
 interface CurrencyContextValue {
+  preferredCountry: CountryCode;
   preferredCurrency: CurrencyCode;
-  setPreferredCurrency: (c: CurrencyCode) => void;
+  setPreferredCountry: (c: CountryCode) => void;
   rates: RatesState;
   convertToPreferred: (amount: number, fromCurrency: string) => number;
   formatInPreferred: (amount: number, fromCurrency: string) => string;
@@ -35,22 +37,22 @@ const defaultRates: RatesState = {
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
 
 const STORAGE_KEY = PREFERRED_CURRENCY_KEY;
-const DEFAULT_CURRENCY: CurrencyCode = "INR";
+const DEFAULT_COUNTRY: CountryCode = "IN";
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
-  const [preferredCurrency, setPreferredCurrencyState] =
-    useState<CurrencyCode>(DEFAULT_CURRENCY);
+  const [preferredCountry, setPreferredCountryState] =
+    useState<CountryCode>(DEFAULT_COUNTRY);
   const [rates, setRates] = useState<RatesState>(defaultRates);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as CurrencyCode | null;
-    if (stored && ["INR", "NPR", "USD", "AED", "CNY", "KRW", "EUR", "GBP"].includes(stored)) {
-      setPreferredCurrencyState(stored);
+    const stored = localStorage.getItem(STORAGE_KEY) as CountryCode | null;
+    if (stored && COUNTRY_CODES.includes(stored)) {
+      setPreferredCountryState(stored);
     }
   }, []);
 
-  const setPreferredCurrency = useCallback((c: CurrencyCode) => {
-    setPreferredCurrencyState(c);
+  const setPreferredCountry = useCallback((c: CountryCode) => {
+    setPreferredCountryState(c);
     localStorage.setItem(STORAGE_KEY, c);
   }, []);
 
@@ -76,24 +78,27 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   const convertToPreferred = useCallback(
     (amount: number, fromCurrency: string): number => {
+      const preferredCurrency = COUNTRY_CURRENCY[preferredCountry];
       if (!rates.rates[fromCurrency] || !rates.rates[preferredCurrency])
         return amount;
       return convert(amount, fromCurrency, preferredCurrency, rates.rates);
     },
-    [rates.rates, preferredCurrency]
+    [rates.rates, preferredCountry]
   );
 
   const formatInPreferred = useCallback(
     (amount: number, fromCurrency: string): string => {
       const converted = convertToPreferred(amount, fromCurrency);
+      const preferredCurrency = COUNTRY_CURRENCY[preferredCountry];
       return formatCurrency(converted, preferredCurrency);
     },
-    [convertToPreferred, preferredCurrency]
+    [convertToPreferred, preferredCountry]
   );
 
   const value: CurrencyContextValue = {
-    preferredCurrency,
-    setPreferredCurrency,
+    preferredCountry,
+    preferredCurrency: COUNTRY_CURRENCY[preferredCountry],
+    setPreferredCountry,
     rates,
     convertToPreferred,
     formatInPreferred,
