@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { AddItemForm } from "@/app/components/add-item-form";
 import { WishlistCard } from "@/app/components/wishlist-card";
 import { AnalyticsPie } from "@/app/components/analytics-pie";
 import { CurrencySetting } from "@/app/components/currency-setting";
 import { PromptInfoModal } from "@/app/components/prompt-info-modal";
 import { useCurrency } from "@/app/lib/currency-context";
+import { supabase } from "@/app/lib/supabase";
+import { AuthForm } from "@/app/components/auth-form";
 import { COUNTRY_CODES, COUNTRY_LABELS } from "@/types";
 import { ITEM_CHART_COLORS } from "@/app/lib/constants";
 import { formatCurrency } from "@/app/lib/utils";
@@ -21,10 +23,61 @@ export default function MainDashboard() {
 
   const { convertToPreferred, preferredCurrency } = useCurrency();
 
-  const handleAdd = useCallback((item: WishlistItem, prompt?: string) => {
+  // Load persisted items for signed-in users
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token || !mounted) return;
+      try {
+        const res = await fetch("/api/wishlist", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? "Failed to load wishlist");
+        if (mounted && data.items) {
+          setItems(data.items);
+        }
+      } catch (err: any) {
+        console.warn("Failed to load wishlist:", err?.message ?? String(err));
+      }
+    }
+    load();
+    const { data: sub } = supabase.auth.onAuthStateChange((_, session) => {
+      if (session?.user) load();
+      if (!session?.user) setItems([]);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const handleAdd = useCallback(async (item: WishlistItem, prompt?: string) => {
+    // Optimistically add locally
     setItems((prev) => [item, ...prev]);
     setSelectedIds((prev) => new Set(prev).add(item.id));
     if (prompt) setLastPrompt(prompt);
+
+    // If user is signed in, persist via server endpoint (verifies token)
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+      const res = await fetch("/api/wishlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ item }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        console.warn("Failed to persist wishlist item:", data.error ?? res.statusText);
+      }
+    } catch (err) {
+      console.warn("Error saving item to server:", err);
+    }
   }, []);
 
   const handleRemove = useCallback((id: string) => {
@@ -109,8 +162,11 @@ export default function MainDashboard() {
               </svg>
             </button>
           </div>
-          <div className="shrink-0 sm:w-40">
-            <CurrencySetting />
+          <div className="shrink-0 flex items-center gap-3">
+            <AuthForm />
+            <div className="sm:w-40">
+              <CurrencySetting />
+            </div>
           </div>
         </div>
       </header>
