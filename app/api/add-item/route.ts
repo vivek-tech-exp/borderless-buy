@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
     const result = await resolveProductWithGemini(query);
     if (!result) {
       return NextResponse.json(
-        { error: "Could not resolve product from query" },
-        { status: 422 }
+        { error: "AI service failed to resolve product. Try again later." },
+        { status: 503 }
       );
     }
     const { product, prompt } = result;
@@ -55,12 +55,12 @@ export async function POST(request: NextRequest) {
 async function resolveProductWithGemini(
   query: string
 ): Promise<{ product: Product; prompt: string } | null> {
-  const model = genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
-    generationConfig: {
-      responseMimeType: "application/json",
-    },
-  });
+  // Models to try in order: best & fresh quota first, then backups
+  const models = [
+    "gemini-3.0-flash",      // Best & Fresh Quota
+    "gemini-2.5-flash-lite", // Backup: Fast & Fresh Quota
+    "gemini-2.5-flash",      // Fallback
+  ];
 
   const prompt = `You are a product resolver for shoppers comparing prices across countries. Given a short query, identify the current flagship or most relevant product and return exactly this JSON (no markdown, no extra text):
 {
@@ -82,47 +82,69 @@ Rules: Provide real or plausible prices in local currency for each country (IN=I
 
   console.log("[Gemini prompt]", prompt);
 
-  const genResult = await model.generateContent(prompt);
-  const text = genResult.response.text();
-  if (!text) return null;
+  for (const modelName of models) {
+    try {
+      console.log(`[Gemini] Trying model: ${modelName}`);
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          responseMimeType: "application/json",
+        },
+      });
 
-  try {
-    const parsed = JSON.parse(text) as Record<string, unknown>;
-    const pricingRaw = parsed.pricing as Record<string, unknown> | undefined;
-    const pricing: Product["pricing"] = {};
+      const genResult = await model.generateContent(prompt);
+      const text = genResult.response.text();
 
-    if (pricingRaw && typeof pricingRaw === "object") {
-      for (const code of COUNTRY_CODES) {
-        const p = pricingRaw[code] as Record<string, unknown> | undefined;
-        if (
-          p &&
-          typeof p.price === "number" &&
-          typeof p.currency === "string" &&
-          typeof p.priceSource === "string" &&
-          typeof p.buyingLink === "string"
-        ) {
-          pricing[code] = {
-            price: Number(p.price),
-            currency: String(p.currency),
-            priceSource: String(p.priceSource),
-            buyingLink: String(p.buyingLink),
-          };
+      if (!text) {
+        console.warn(`[Gemini] Model ${modelName} returned empty response, trying next model`);
+        continue;
+      }
+
+      console.log(`[Gemini] Model ${modelName} succeeded`);
+
+      // Parse and validate response
+      const parsed = JSON.parse(text) as Record<string, unknown>;
+      const pricingRaw = parsed.pricing as Record<string, unknown> | undefined;
+      const pricing: Product["pricing"] = {};
+
+      if (pricingRaw && typeof pricingRaw === "object") {
+        for (const code of COUNTRY_CODES) {
+          const p = pricingRaw[code] as Record<string, unknown> | undefined;
+          if (
+            p &&
+            typeof p.price === "number" &&
+            typeof p.currency === "string" &&
+            typeof p.priceSource === "string" &&
+            typeof p.buyingLink === "string"
+          ) {
+            pricing[code] = {
+              price: Number(p.price),
+              currency: String(p.currency),
+              priceSource: String(p.priceSource),
+              buyingLink: String(p.buyingLink),
+            };
+          }
         }
       }
-    }
 
-    const product: Product = {
-      id: String(parsed.id ?? crypto.randomUUID()),
-      name: String(parsed.name ?? query),
-      displayName: String(parsed.displayName ?? parsed.name ?? query),
-      category: ["tech", "vehicle", "other"].includes(String(parsed.category))
-        ? (parsed.category as Product["category"])
-        : "other",
-      carryOnFriendly: Boolean(parsed.carryOnFriendly),
-      pricing,
-    };
-    return { product, prompt };
-  } catch {
-    return null;
+      const product: Product = {
+        id: String(parsed.id ?? crypto.randomUUID()),
+        name: String(parsed.name ?? query),
+        displayName: String(parsed.displayName ?? parsed.name ?? query),
+        category: ["tech", "vehicle", "other"].includes(String(parsed.category))
+          ? (parsed.category as Product["category"])
+          : "other",
+        carryOnFriendly: Boolean(parsed.carryOnFriendly),
+        pricing,
+      };
+
+      return { product, prompt };
+    } catch (err) {
+      console.error(`[Gemini] Model ${modelName} failed:`, err instanceof Error ? err.message : String(err));
+      // Continue to next model
+    }
   }
+
+  console.error("[Gemini] All models exhausted");
+  return null;
 }

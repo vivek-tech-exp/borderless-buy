@@ -43,7 +43,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
     <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
       <Input
         type="text"
-        placeholder="e.g. MacBook, iPhone 16, Honda CB350"
+        placeholder="e.g., MacBook, camera, motorcycle…"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         disabled={loading}
