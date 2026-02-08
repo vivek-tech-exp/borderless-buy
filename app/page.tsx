@@ -81,10 +81,10 @@ export default function MainDashboard() {
           <div className="flex flex-1 items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
-                My Wishlist
+                Borderless Buy
               </h1>
               <p className="mt-1.5 text-sm text-zinc-500">
-                Track items you want to buy and discover savings by shopping globally. See your total investment goal and find the best prices across 6 countries.
+                Your wishlist — plan purchases, track totals, and find where to save by buying globally.
               </p>
             </div>
             <button

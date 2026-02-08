@@ -1,12 +1,11 @@
 "use client";
 
 import { useCurrency } from "@/app/lib/currency-context";
-import type { CurrencyCode } from "@/types";
-import { CURRENCY_CODES } from "@/types";
-import { CURRENCY_LABELS } from "@/app/lib/constants";
+import type { CountryCode } from "@/types";
+import { COUNTRY_CODES, COUNTRY_LABELS, COUNTRY_CURRENCY } from "@/types";
 
 export function CurrencySetting() {
-  const { preferredCurrency, setPreferredCurrency, rates } = useCurrency();
+  const { preferredCountry, setPreferredCountry, rates } = useCurrency();
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -17,19 +16,20 @@ export function CurrencySetting() {
         View prices in
       </label>
       <select
-        id="currency-select"
-        value={preferredCurrency}
+        id="country-select"
+        value={preferredCountry}
         onChange={(e) =>
-          setPreferredCurrency(e.target.value as CurrencyCode)
+          setPreferredCountry(e.target.value as CountryCode)
         }
         className="rounded-lg border border-zinc-600 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
       >
-        {CURRENCY_CODES.map((code) => (
+        {COUNTRY_CODES.map((code) => (
           <option key={code} value={code}>
-            {CURRENCY_LABELS[code] ?? code}
+            {COUNTRY_LABELS[code]}
           </option>
         ))}
       </select>
+      <p className="text-[10px] text-zinc-600">Currency: <span className="font-medium">{COUNTRY_CURRENCY[preferredCountry]}</span></p>
       {rates.updatedAt && (
         <p className="text-[10px] text-zinc-600">
           Rates updated {new Date(rates.updatedAt).toLocaleDateString()}

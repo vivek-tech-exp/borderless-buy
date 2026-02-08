@@ -21,75 +21,104 @@ interface AnalyticsPieProps {
 }
 
 export function AnalyticsPie({ items, hoveredItemId }: AnalyticsPieProps) {
-  const { convertToPreferred, preferredCurrency } = useCurrency();
+  const { convertToPreferred, preferredCountry, preferredCurrency } = useCurrency();
 
-  const displayItems =
-    hoveredItemId != null
-      ? items.filter((i) => i.id === hoveredItemId)
-      : items;
+  const displayItems = hoveredItemId != null ? items.filter((i) => i.id === hoveredItemId) : items;
 
-  const preferredCountry = (Object.entries(COUNTRY_CURRENCY).find(([, cur]) => cur === preferredCurrency)?.[0] ?? null) as
-    | typeof COUNTRY_CODES[number]
-    | null;
+  // Build data per product: choose the best country (min converted price) for each product
+  const productsData = displayItems
+    .map((item) => {
+      const entries = COUNTRY_CODES.map((code) => {
+        const p = item.product.pricing[code];
+        if (!p) return null;
+        const converted = convertToPreferred(p.price, p.currency);
+        return { code, converted, original: p } as const;
+      }).filter(Boolean) as Array<{ code: string; converted: number; original: any }>; // keep simple
 
-  const data = COUNTRY_CODES.map((code) => {
-    const total = displayItems.reduce((sum, item) => {
-      const p = item.product.pricing[code];
-      if (!p) return sum;
-      const converted = convertToPreferred(p.price, p.currency);
-      return sum + converted;
-    }, 0);
-    return {
-      name: COUNTRY_LABELS[code],
-      code,
-      value: Math.round(total * 100) / 100,
-      fill: ITEM_CHART_COLORS[code],
-      // dim the slice fill a bit if it corresponds to the user's preferred currency
-      fillOpacity: code === preferredCountry ? 0.45 : 1,
-    };
-  }).filter((d) => d.value > 0);
+      if (entries.length === 0) return null;
+
+      const best = entries.reduce((a, b) => (a.converted <= b.converted ? a : b));
+      const homeEntry = item.product.pricing[preferredCountry];
+      const homeConverted = homeEntry ? convertToPreferred(homeEntry.price, homeEntry.currency) : null;
+
+      return {
+        id: item.id,
+        name: item.product.displayName,
+        bestCountry: best.code,
+        bestValue: Math.round(best.converted * 100) / 100,
+        homeValue: homeConverted != null ? Math.round(homeConverted * 100) / 100 : null,
+      };
+    })
+    .filter(Boolean) as Array<{
+      id: string;
+      name: string;
+      bestCountry: string;
+      bestValue: number;
+      homeValue: number | null;
+    }>;
+
+  const data = productsData.map((p) => ({
+    name: p.name,
+    code: p.bestCountry,
+    value: p.bestValue,
+    fill: ITEM_CHART_COLORS[p.bestCountry as keyof typeof ITEM_CHART_COLORS] ?? "#333",
+  }));
+
+  const optimizedTotal = productsData.reduce((s, p) => s + p.bestValue, 0);
+  const homeTotal = productsData.reduce((s, p) => s + (p.homeValue ?? p.bestValue), 0);
 
   if (data.length === 0) {
     return (
       <div className="flex h-[260px] items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/50 text-sm text-zinc-500">
-        {hoveredItemId
-          ? "Hover a card to see it here"
-          : "Select items to see cost by country"}
+        {hoveredItemId ? "Hover an item to see it here" : "Select items to see your wishlist breakdown"}
       </div>
     );
   }
 
   return (
-    <div className="h-[260px] w-full">
-      <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
-          <Pie
-            data={data}
-            cx="50%"
-            cy="50%"
-            innerRadius={55}
-            outerRadius={85}
-            paddingAngle={2}
-            dataKey="value"
-            nameKey="name"
-          >
-            {data.map((entry) => (
-              <Cell key={entry.code} fill={entry.fill} fillOpacity={entry.fillOpacity ?? 1} />
-            ))}
-          </Pie>
-          <Tooltip
-            formatter={(value: number) =>
-              formatCurrency(value, preferredCurrency)
-            }
-            contentStyle={{
-              backgroundColor: "rgb(39 39 42)",
-              border: "1px solid rgb(63 63 70)",
-              borderRadius: "8px",
-            }}
-          />
-          <Legend />
-        </PieChart>
-      </ResponsiveContainer>
+    <div className="w-full">
+      <div className="mb-3 flex items-end justify-between gap-4">
+        <div>
+          <div className="text-xs text-zinc-400">Optimized total</div>
+          <div className="text-lg font-semibold text-emerald-400">{formatCurrency(optimizedTotal, preferredCurrency)}</div>
+        </div>
+        <div className="text-right">
+          <div className="text-xs text-zinc-400">If bought from {preferredCountry}</div>
+          <div className="text-lg font-semibold text-zinc-100">{formatCurrency(homeTotal, preferredCurrency)}</div>
+        </div>
+      </div>
+
+      <div className="h-[300px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius={60}
+              outerRadius={100}
+              paddingAngle={2}
+              dataKey="value"
+              nameKey="name"
+            >
+              {data.map((entry) => (
+                <Cell key={entry.name} fill={entry.fill} />
+              ))}
+            </Pie>
+            <Tooltip
+              formatter={(value: number, name?: string, props?: any) => {
+                return [formatCurrency(value, preferredCurrency), "Cost"];
+              }}
+              contentStyle={{
+                backgroundColor: "rgb(39 39 42)",
+                border: "1px solid rgb(63 63 70)",
+                borderRadius: "8px",
+              }}
+            />
+            <Legend />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
