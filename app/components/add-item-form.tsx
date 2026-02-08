@@ -1,0 +1,60 @@
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/app/components/ui/button";
+import { Input } from "@/app/components/ui/input";
+import type { WishlistItem } from "@/types";
+
+interface AddItemFormProps {
+  onAdd: (item: WishlistItem, prompt?: string) => void;
+}
+
+export function AddItemForm({ onAdd }: AddItemFormProps) {
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const q = query.trim();
+    if (!q) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch("/api/add-item", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: q }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to add item");
+      const item = data.item ?? data;
+      const prompt = data.prompt;
+      onAdd(item as WishlistItem, prompt);
+      setQuery("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
+      <Input
+        type="text"
+        placeholder="e.g. MacBook, iPhone 16, Honda CB350"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        disabled={loading}
+        className="min-w-0 flex-1"
+      />
+      <Button type="submit" disabled={loading} className="shrink-0 px-6">
+        {loading ? "Adding…" : "Add"}
+      </Button>
+      {error && (
+        <p className="text-sm text-red-400 col-span-full mt-0.5">{error}</p>
+      )}
+    </form>
+  );
+}
