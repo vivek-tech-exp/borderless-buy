@@ -81,11 +81,10 @@ export default function MainDashboard() {
           <div className="flex flex-1 items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
-                Borderless Buy
+                My Wishlist
               </h1>
               <p className="mt-1.5 text-sm text-zinc-500">
-                Compare prices across India, Nepal, USA, UAE Dubai, China & South
-                Korea. Select items for charts; hover a card to highlight.
+                Track items you want to buy and discover savings by shopping globally. See your total investment goal and find the best prices across 6 countries.
               </p>
             </div>
             <button
@@ -123,23 +122,25 @@ export default function MainDashboard() {
       {showTotals && (
         <section className="mb-8">
           <h2 className="mb-4 text-sm font-medium text-zinc-400">
-            Total by country (selected)
+            Your investment by country
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {totalsByCountry.map(({ code, label, total }) => (
               <div
                 key={code}
-                className="rounded-xl border border-zinc-700/80 bg-zinc-900/80 px-4 py-3"
+                className="rounded-xl border border-zinc-700/80 bg-zinc-900/80 px-3 py-3 min-h-[100px] flex flex-col justify-between"
               >
-                <span
-                  className="mb-1 block h-1.5 w-1.5 rounded-full"
-                  style={{ backgroundColor: ITEM_CHART_COLORS[code] }}
-                  aria-hidden
-                />
-                <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500">
-                  {label}
-                </p>
-                <p className="mt-0.5 text-lg font-semibold tabular-nums text-zinc-100">
+                <div className="min-w-0">
+                  <span
+                    className="mb-1 block h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: ITEM_CHART_COLORS[code] }}
+                    aria-hidden
+                  />
+                  <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 truncate">
+                    {label}
+                  </p>
+                </div>
+                <p className="mt-2 text-base font-semibold tabular-nums text-zinc-100 break-words">
                   {total > 0
                     ? formatCurrency(total, preferredCurrency)
                     : "—"}
@@ -148,8 +149,8 @@ export default function MainDashboard() {
             ))}
           </div>
           {bestTotal > 0 && (
-            <p className="mt-3 text-sm text-zinc-500">
-              Best total:{" "}
+            <p className="mt-4 text-sm text-zinc-400">
+              💰 Cheapest option:{" "}
               <span className="font-medium text-emerald-400">
                 {formatCurrency(bestTotal, preferredCurrency)}
               </span>
@@ -160,7 +161,7 @@ export default function MainDashboard() {
 
       <section className="mb-8">
         <h2 className="mb-4 text-sm font-medium text-zinc-400">
-          Cost share by country
+          Cost breakdown by country
         </h2>
         <AnalyticsPie items={chartItems} hoveredItemId={hoveredItemId} />
       </section>
@@ -190,8 +191,7 @@ export default function MainDashboard() {
         </div>
         {items.length === 0 ? (
           <p className="rounded-xl border border-dashed border-zinc-700 py-10 text-center text-sm text-zinc-500">
-            No items yet. Add something like &quot;MacBook&quot; or &quot;iPhone
-            16&quot; above.
+            Start building your wishlist! Add items you want to buy (e.g., MacBook, iPhone 16, or a motorcycle) to see total costs and find the best deals globally.
           </p>
         ) : (
           <ul className="grid gap-4 lg:grid-cols-2">

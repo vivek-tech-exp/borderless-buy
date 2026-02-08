@@ -14,7 +14,7 @@ export function CurrencySetting() {
         htmlFor="currency-select"
         className="text-xs font-medium text-zinc-500"
       >
-        Display currency
+        View prices in
       </label>
       <select
         id="currency-select"

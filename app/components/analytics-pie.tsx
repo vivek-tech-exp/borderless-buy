@@ -10,6 +10,7 @@ import {
 } from "recharts";
 import type { WishlistItem } from "@/types";
 import { COUNTRY_CODES, COUNTRY_LABELS } from "@/types";
+import { COUNTRY_CURRENCY } from "@/types";
 import { useCurrency } from "@/app/lib/currency-context";
 import { ITEM_CHART_COLORS } from "@/app/lib/constants";
 import { formatCurrency } from "@/app/lib/utils";
@@ -27,6 +28,10 @@ export function AnalyticsPie({ items, hoveredItemId }: AnalyticsPieProps) {
       ? items.filter((i) => i.id === hoveredItemId)
       : items;
 
+  const preferredCountry = (Object.entries(COUNTRY_CURRENCY).find(([, cur]) => cur === preferredCurrency)?.[0] ?? null) as
+    | typeof COUNTRY_CODES[number]
+    | null;
+
   const data = COUNTRY_CODES.map((code) => {
     const total = displayItems.reduce((sum, item) => {
       const p = item.product.pricing[code];
@@ -39,6 +44,8 @@ export function AnalyticsPie({ items, hoveredItemId }: AnalyticsPieProps) {
       code,
       value: Math.round(total * 100) / 100,
       fill: ITEM_CHART_COLORS[code],
+      // dim the slice fill a bit if it corresponds to the user's preferred currency
+      fillOpacity: code === preferredCountry ? 0.45 : 1,
     };
   }).filter((d) => d.value > 0);
 
@@ -67,7 +74,7 @@ export function AnalyticsPie({ items, hoveredItemId }: AnalyticsPieProps) {
             nameKey="name"
           >
             {data.map((entry) => (
-              <Cell key={entry.code} fill={entry.fill} />
+              <Cell key={entry.code} fill={entry.fill} fillOpacity={entry.fillOpacity ?? 1} />
             ))}
           </Pie>
           <Tooltip
