@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { GlobeAltIcon, ChartPieIcon, CurrencyDollarIcon, BellAlertIcon } from "@heroicons/react/24/outline";
 import { AddItemForm } from "@/app/components/add-item-form";
 import { WishlistCard } from "@/app/components/wishlist-card";
@@ -33,6 +33,7 @@ export default function MainDashboard() {
   const [totalsExpanded, setTotalsExpanded] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("global");
   const [incomeInput, setIncomeInput] = useState<string>("");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const hasLoadedFromStorage = useRef(false);
 
   const { convertToPreferred, preferredCurrency, preferredCountry } = useCurrency();
@@ -319,13 +320,33 @@ export default function MainDashboard() {
     });
   }, []);
 
-  const selectAll = useCallback(() => {
-    setSelectedIds(new Set(items.map((i) => i.id)));
-  }, [items]);
+  const handleUpdateTag = useCallback(async (id: string, tag: string | null) => {
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, tag: tag ?? undefined } : item))
+    );
 
-  const deselectAll = useCallback(() => {
-    setSelectedIds(new Set());
-  }, []);
+    if (!user) return;
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) return;
+
+      const res = await fetch("/api/wishlist", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ id, tag }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        console.warn("Failed to update tag:", data.error ?? res.statusText);
+      }
+    } catch (err) {
+      console.warn("Error updating tag:", err);
+    }
+  }, [user]);
 
   const incomeAmount = Number(incomeInput);
   const safeIncomeAmount = Number.isFinite(incomeAmount) ? incomeAmount : 0;
@@ -402,14 +423,48 @@ export default function MainDashboard() {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, [user]);
 
-  const selectedItems = items.filter((i) => selectedIds.has(i.id));
+  const availableTags = useMemo(() => {
+    const tags = new Set<string>();
+    items.forEach((item) => {
+      const trimmed = item.tag?.trim();
+      if (trimmed) tags.add(trimmed);
+    });
+    return Array.from(tags).sort((a, b) => a.localeCompare(b));
+  }, [items]);
+
+  const displayItems = selectedTag
+    ? items.filter((item) => item.tag?.trim() === selectedTag)
+    : items;
+
+  useEffect(() => {
+    if (selectedTag && !availableTags.includes(selectedTag)) {
+      setSelectedTag(null);
+    }
+  }, [availableTags, selectedTag]);
+
+  useEffect(() => {
+    if (!hoveredItemId) return;
+    const isVisible = displayItems.some((item) => item.id === hoveredItemId);
+    if (!isVisible) setHoveredItemId(null);
+  }, [displayItems, hoveredItemId]);
+
+  const selectAll = useCallback(() => {
+    setSelectedIds(new Set(displayItems.map((i) => i.id)));
+  }, [displayItems]);
+
+  const deselectAll = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const selectedItems = displayItems.filter((i) => selectedIds.has(i.id));
+  const itemsForTotals = selectedTag ? displayItems : selectedItems;
   const chartItems =
     hoveredItemId != null
-      ? items.filter((i) => i.id === hoveredItemId)
-      : selectedItems;
+      ? displayItems.filter((i) => i.id === hoveredItemId)
+      : itemsForTotals;
 
   const totalsByCountry = COUNTRY_CODES.map((code) => {
-    const total = selectedItems.reduce((sum, item) => {
+    const total = itemsForTotals.reduce((sum, item) => {
       const p = item.product.pricing[code];
       if (!p || p.price === null) return sum;
       return sum + convertToPreferred(p.price, p.currency);
@@ -420,7 +475,7 @@ export default function MainDashboard() {
     (min, t) => (t.total > 0 && (min === 0 || t.total < min) ? t.total : min),
     0
   );
-  const showTotals = selectedItems.length > 0 && !hoveredItemId;
+  const showTotals = itemsForTotals.length > 0 && !hoveredItemId;
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
@@ -599,6 +654,41 @@ export default function MainDashboard() {
             </div>
           )}
         </div>
+        {availableTags.length > 0 && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                Goals
+              </span>
+              <span className="h-3 w-px" style={{backgroundColor: 'var(--border-primary)'}} aria-hidden />
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedTag(null)}
+              className="text-xs rounded-full px-3 py-1 transition-colors"
+              style={{
+                backgroundColor: selectedTag ? 'var(--bg-secondary)' : 'var(--accent-primary)',
+                color: selectedTag ? 'var(--text-secondary)' : 'white',
+              }}
+            >
+              All
+            </button>
+            {availableTags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setSelectedTag(tag)}
+                className="text-xs rounded-full px-3 py-1 transition-colors"
+                style={{
+                  backgroundColor: selectedTag === tag ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+                  color: selectedTag === tag ? 'white' : 'var(--text-secondary)',
+                }}
+              >
+                #{tag}
+              </button>
+            ))}
+          </div>
+        )}
         {items.length === 0 ? (
           <div className="relative rounded-[12px] border px-6 py-16 text-center" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
             <div className="mx-auto max-w-sm space-y-6">
@@ -633,9 +723,15 @@ export default function MainDashboard() {
               </button>
             </div>
           </div>
+        ) : displayItems.length === 0 ? (
+          <div className="rounded-[12px] border px-6 py-10 text-center" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+            <p className="text-sm text-[var(--text-secondary)]">
+              No items match this tag yet.
+            </p>
+          </div>
         ) : (
           <ul className="grid gap-4 lg:grid-cols-2">
-            {items.map((item) => (
+            {displayItems.map((item) => (
               <li key={item.id}>
                 <WishlistCard
                   item={item}
@@ -648,6 +744,8 @@ export default function MainDashboard() {
                   viewMode={viewMode}
                   incomeAmount={safeIncomeAmount}
                   onIncomeFocus={handleIncomeFocus}
+                  onUpdateTag={handleUpdateTag}
+                  availableTags={availableTags}
                 />
               </li>
             ))}
@@ -697,7 +795,7 @@ export default function MainDashboard() {
                       : formatCurrency(0, preferredCurrency)}
                   </p>
                   <p className="text-xs mt-2" style={{color: 'var(--text-tertiary)'}}>
-                    Cost for {selectedItems.length} {selectedItems.length === 1 ? 'item' : 'items'}
+                    Cost for {itemsForTotals.length} {itemsForTotals.length === 1 ? 'item' : 'items'}
                   </p>
                 </div>
               </>

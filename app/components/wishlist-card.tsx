@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircleIcon, XCircleIcon, ClockIcon, LightBulbIcon, TrashIcon } from "@heroicons/react/24/outline";
 import type { WishlistItem, CountryCode } from "@/types";
 import { COUNTRY_CODES, COUNTRY_LABELS } from "@/types";
@@ -8,6 +8,7 @@ import { useCurrency } from "@/app/lib/currency-context";
 import { formatCurrency } from "@/app/lib/utils";
 import { Card, CardContent, CardHeader } from "@/app/components/ui/card";
 import { ITEM_CHART_COLORS } from "@/app/lib/constants";
+import { Input } from "@/app/components/ui/input";
 
 export type ViewMode = "local" | "global";
 
@@ -22,6 +23,8 @@ interface WishlistCardProps {
   viewMode?: ViewMode;
   incomeAmount?: number;
   onIncomeFocus?: () => void;
+  onUpdateTag?: (id: string, tag: string | null) => void;
+  availableTags?: string[];
 }
 
 export function WishlistCard({
@@ -35,10 +38,18 @@ export function WishlistCard({
   viewMode = "global",
   incomeAmount,
   onIncomeFocus,
+  onUpdateTag,
+  availableTags = [],
 }: WishlistCardProps) {
   const [showDetails, setShowDetails] = useState(false);
+  const [isEditingTag, setIsEditingTag] = useState(false);
+  const [tagInput, setTagInput] = useState(item.tag ?? "");
   const { convertToPreferred, preferredCurrency, preferredCountry, rates } = useCurrency();
   const { product } = item;
+
+  useEffect(() => {
+    setTagInput(item.tag ?? "");
+  }, [item.tag]);
 
   const pricesByCountry = COUNTRY_CODES.map((code) => {
     const p = product.pricing[code];
@@ -95,6 +106,21 @@ export function WishlistCard({
     ? `${incomeRatio.toFixed(1)}x your monthly income`
     : null;
 
+  const commitTag = () => {
+    if (!onUpdateTag) {
+      setIsEditingTag(false);
+      return;
+    }
+    const trimmed = tagInput.trim();
+    onUpdateTag(item.id, trimmed.length > 0 ? trimmed : null);
+    setIsEditingTag(false);
+  };
+
+  const cancelTagEdit = () => {
+    setTagInput(item.tag ?? "");
+    setIsEditingTag(false);
+  };
+
   return (
     <Card
       className={`overflow-hidden transition-all ${
@@ -122,6 +148,73 @@ export function WishlistCard({
               <span className="inline-block px-2 py-0.5 text-xs rounded-full" style={{backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)'}}>
                 {product.carryOnFriendly ? "🌍 Global Asset" : "🏠 Local Purchase"}
               </span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {!isEditingTag && item.tag && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingTag(true)}
+                  className="text-xs rounded-full px-2 py-0.5 transition-colors"
+                  style={{backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)'}}
+                >
+                  #{item.tag}
+                </button>
+              )}
+              {!isEditingTag && !item.tag && onUpdateTag && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingTag(true)}
+                  className="text-xs transition-colors"
+                  style={{color: 'var(--accent-primary)'}}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+                >
+                  + Add goal tag
+                </button>
+              )}
+              {isEditingTag && (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    commitTag();
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    placeholder="Goal tag"
+                    list={`goal-tags-${item.id}`}
+                    className="h-8 px-3 py-1 text-xs w-36"
+                    aria-label="Goal tag"
+                  />
+                  <datalist id={`goal-tags-${item.id}`}>
+                    {availableTags.map((tag) => (
+                      <option key={tag} value={tag} />
+                    ))}
+                  </datalist>
+                  <button
+                    type="submit"
+                    className="text-xs rounded-md px-2 py-1 transition-colors"
+                    style={{color: 'var(--accent-primary)'}}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cancelTagEdit}
+                    className="text-xs rounded-md px-2 py-1 transition-colors"
+                    style={{color: 'var(--text-tertiary)'}}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
+                  >
+                    Cancel
+                  </button>
+                </form>
+              )}
             </div>
           </div>
           {onRemove && (

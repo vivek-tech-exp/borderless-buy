@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     const supabase = makeAdminClient();
     const { data, error } = await supabase
       .from("wishlist")
-      .select("id, product, created_at")
+      .select("id, product, tag, created_at")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
 
@@ -53,7 +53,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Map to client WishlistItem shape
-    const items = (data ?? []).map((r: any) => ({ id: r.id, product: r.product, createdAt: r.created_at }));
+    const items = (data ?? []).map((r: any) => ({
+      id: r.id,
+      product: r.product,
+      tag: r.tag ?? undefined,
+      createdAt: r.created_at,
+    }));
     return NextResponse.json({ items });
   } catch (err) {
     console.error("GET /api/wishlist exception:", err);
@@ -76,9 +81,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid item payload" }, { status: 400 });
     }
 
+    const tag = typeof item.tag === "string" ? item.tag.trim() : "";
+    const sanitizedTag = tag.length > 0 ? tag : null;
+
     const supabase = makeAdminClient();
     const { error } = await supabase.from("wishlist").insert([
-      { id: item.id, user_id: userId, product: item.product },
+      { id: item.id, user_id: userId, product: item.product, tag: sanitizedTag },
     ]);
     if (error) {
       console.error("POST /api/wishlist insert error:", error.message);
@@ -137,6 +145,44 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/wishlist exception:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const auth = request.headers.get("authorization") ?? "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth || undefined;
+    if (!token) return NextResponse.json({ error: "Missing access token" }, { status: 401 });
+
+    const userId = verifyTokenAndGetUserId(token);
+    if (!userId) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+
+    const body = await request.json();
+    const itemId = body?.id;
+    if (!itemId || typeof itemId !== "string") {
+      return NextResponse.json({ error: "Missing item id" }, { status: 400 });
+    }
+
+    const rawTag = typeof body?.tag === "string" ? body.tag : "";
+    const trimmedTag = rawTag.trim();
+    const sanitizedTag = trimmedTag.length > 0 ? trimmedTag : null;
+
+    const supabase = makeAdminClient();
+    const { error: updateError } = await supabase
+      .from("wishlist")
+      .update({ tag: sanitizedTag })
+      .eq("id", itemId)
+      .eq("user_id", userId);
+
+    if (updateError) {
+      console.error("PATCH /api/wishlist error:", updateError.message);
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("PATCH /api/wishlist exception:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

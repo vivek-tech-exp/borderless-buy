@@ -81,6 +81,7 @@ export interface Product {
 export interface WishlistItem {
   id: string;
   product: Product;
+  tag?: string;
   createdAt: string;
 }
 
