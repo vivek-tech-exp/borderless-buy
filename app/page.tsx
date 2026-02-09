@@ -139,15 +139,15 @@ export default function MainDashboard() {
   const showTotals = selectedItems.length > 0 && !hoveredItemId;
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-      <header className="mb-8">
+    <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
+      <header className="mb-12">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex flex-1 items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-zinc-100">
+              <h1 className="text-3xl font-bold tracking-tight text-zinc-100">
                 Borderless Buy
               </h1>
-              <p className="mt-1.5 text-sm text-zinc-500">
+              <p className="mt-2 text-sm text-zinc-400">
                 Find the best deals worldwide 🌍 See what things cost in different countries & save big.
               </p>
             </div>
@@ -183,19 +183,19 @@ export default function MainDashboard() {
       </header>
 
       {items.length > 0 && !user && (
-        <section className="mb-6 rounded-lg border border-amber-900 bg-amber-950/50 p-4">
+        <section className="mb-12 rounded-lg border border-amber-900 bg-amber-950/50 p-4">
           <p className="text-sm text-amber-100">
             <span className="font-medium">⏰ Heads up!</span> Your wishlist will vanish if you refresh. Sign in to lock it in forever—it's free!
           </p>
         </section>
       )}
 
-      <section className="mb-8">
+      <section className="mb-12">
         <AddItemForm onAdd={handleAdd} />
       </section>
 
-      <section>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <section className="mb-12">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-medium text-zinc-400">✨ Your Wishlist</h2>
           {items.length > 0 && (
             <div className="flex items-center gap-1">
@@ -263,16 +263,16 @@ export default function MainDashboard() {
         )}
       </section>
 
-      <section className="mb-8">
-        <h2 className="mb-4 text-sm font-medium text-zinc-400">
+      <section className="mb-12">
+        <h2 className="mb-6 text-sm font-medium text-zinc-400">
           📊 See prices across the world
         </h2>
         <AnalyticsPie items={chartItems} hoveredItemId={hoveredItemId} />
       </section>
 
       {showTotals && (
-        <section className="mb-8">
-          <div className="mb-4 flex items-center justify-between gap-3">
+        <section className="mb-12">
+          <div className="mb-6 flex items-center justify-between gap-3">
             <h2 className="text-sm font-medium text-zinc-400">
               💰 How much you'd spend in each country
             </h2>

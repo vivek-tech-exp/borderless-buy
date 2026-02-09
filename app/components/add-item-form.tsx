@@ -40,22 +40,24 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
-      <Input
-        type="text"
-        placeholder="e.g., MacBook, camera, motorcycle…"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        disabled={loading}
-        className="min-w-0 flex-1"
-      />
-      <Button type="submit" disabled={loading} className="shrink-0 px-6">
-        {loading ? "Adding…" : "Add"}
-      </Button>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
+        <Input
+          type="text"
+          placeholder="e.g., MacBook, camera, motorcycle…"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          disabled={loading}
+          className="min-w-0 flex-1"
+        />
+        <Button type="submit" disabled={loading} className="shrink-0 px-6">
+          {loading ? "Adding…" : "Add"}
+        </Button>
+      </div>
       {error && (
-        <p className="text-sm text-red-400 col-span-full mt-0.5">{error}</p>
+        <p className="text-sm text-red-400">{error}</p>
       )}
-      <p className="text-xs text-zinc-500 col-span-full">
+      <p className="text-xs text-zinc-500">
         💬 Tip: Sign in to keep your list forever. Your future self will thank you!
       </p>
     </form>
