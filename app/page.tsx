@@ -218,9 +218,32 @@ export default function MainDashboard() {
           )}
         </div>
         {items.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-zinc-700 py-10 text-center text-sm text-zinc-500">
-            Dream big! 🚀 Add something you want (like a MacBook, headphones, or even a bike) and we'll show you the best prices around the world.
-          </p>
+          <div className="relative rounded-[12px] border border-zinc-700 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black px-6 py-16 text-center shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+            <div className="mx-auto max-w-sm space-y-6">
+              <div className="flex justify-center">
+                <div className="h-12 w-12 rounded-full border-2 border-emerald-600/30 flex items-center justify-center">
+                  <div className="h-6 w-6 rounded-full bg-emerald-600/20" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-white">
+                  Ready to find better prices?
+                </h3>
+                <p className="text-sm text-zinc-400 leading-relaxed">
+                  Add a product you&apos;re interested in — a MacBook, headphones, camera, or anything else — and we&apos;ll compare prices across 10 countries instantly.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const input = document.querySelector('input[placeholder*="e.g."]') as HTMLInputElement;
+                  input?.focus();
+                }}
+                className="text-sm font-medium text-emerald-600 hover:text-emerald-500 transition-colors"
+              >
+                Start comparing
+              </button>
+            </div>
+          </div>
         ) : (
           <ul className="grid gap-4 lg:grid-cols-2">
             {items.map((item) => (
