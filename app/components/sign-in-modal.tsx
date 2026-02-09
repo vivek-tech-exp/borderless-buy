@@ -170,7 +170,7 @@ export function SignInModal({ isOpen, onClose, onUserChange }: SignInModalProps)
                   id="email"
                   name="email"
                   type="email"
-                  autoComplete="email"
+                  autoComplete="off"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && signIn()}

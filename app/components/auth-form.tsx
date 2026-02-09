@@ -83,7 +83,7 @@ export function AuthForm({ onUserChange }: { onUserChange?: (user: any) => void 
         <input
           type="email"
           name="email"
-          autoComplete="email"
+          autoComplete="off"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Your email"
