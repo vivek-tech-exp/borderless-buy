@@ -30,7 +30,7 @@ export function AnalyticsPie({ items, hoveredItemId }: AnalyticsPieProps) {
     .map((item) => {
       const entries = COUNTRY_CODES.map((code) => {
         const p = item.product.pricing[code];
-        if (!p) return null;
+        if (!p || p.price === null) return null;
         const converted = convertToPreferred(p.price, p.currency);
         return { code, converted, original: p } as const;
       }).filter(Boolean) as Array<{ code: string; converted: number; original: any }>; // keep simple
@@ -39,7 +39,7 @@ export function AnalyticsPie({ items, hoveredItemId }: AnalyticsPieProps) {
 
       const best = entries.reduce((a, b) => (a.converted <= b.converted ? a : b));
       const homeEntry = item.product.pricing[preferredCountry];
-      const homeConverted = homeEntry ? convertToPreferred(homeEntry.price, homeEntry.currency) : null;
+      const homeConverted = homeEntry && homeEntry.price !== null ? convertToPreferred(homeEntry.price, homeEntry.currency) : null;
 
       return {
         id: item.id,
