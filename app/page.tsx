@@ -40,8 +40,10 @@ export default function MainDashboard() {
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as WishlistItem[];
+        console.log(`📦 Restored ${parsed.length} items from localStorage`);
         setItems(parsed);
       } catch {
+        console.warn("⚠️ Corrupted localStorage data, clearing it");
         localStorage.removeItem(LOCAL_WISHLIST_KEY);
       }
     }
@@ -55,19 +57,48 @@ export default function MainDashboard() {
   // Load persisted items for signed-in users; sync with auth state
   useEffect(() => {
     let mounted = true;
+    
     async function load() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+      
+      // Update user state immediately
+      if (session?.user && mounted) {
+        setUser(session.user);
+      }
+      
       const token = session?.access_token;
       if (!token || !mounted) return;
+      
       try {
+        // First, check if we need to migrate guest data
+        const guestData = localStorage.getItem(LOCAL_WISHLIST_KEY);
+        let hasGuestData = false;
+        
+        if (guestData) {
+          try {
+            const parsed = JSON.parse(guestData);
+            hasGuestData = Array.isArray(parsed) && parsed.length > 0;
+          } catch {
+            // Corrupted data, ignore and clear it
+            localStorage.removeItem(LOCAL_WISHLIST_KEY);
+          }
+        }
+        
+        // If there's guest data, migrate it first
+        if (hasGuestData) {
+          await migrateGuestDataToServer();
+        }
+        
+        // Now load from server
         const res = await fetch("/api/wishlist", {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Failed to load wishlist");
         if (mounted && data.items) {
+          console.log(`📥 Loaded ${data.items.length} items from server`);
           setItems(data.items);
           // Clear guest localStorage after successful sync
           localStorage.removeItem(LOCAL_WISHLIST_KEY);
@@ -159,10 +190,14 @@ export default function MainDashboard() {
     load();
     const { data: sub } = supabase.auth.onAuthStateChange((_, session) => {
       if (session?.user) {
+        // Update user state
+        setUser(session.user);
         // User signed in: migrate guest data first, then load from server
         migrateGuestDataToServer().then(() => load());
       } else {
-        // User signed out: start fresh (don't restore guest data)
+        // User signed out
+        setUser(null);
+        // Start fresh (don't restore guest data)
         // Even if guest data exists in localStorage, we don't use it
         // Users who were migrated should see empty state until they sign back in
         setItems([]);
@@ -306,8 +341,12 @@ export default function MainDashboard() {
   }, []);
 
   useEffect(() => {
-    if (user) return;
+    if (user) {
+      console.log("💾 Skipping localStorage save (user logged in)");
+      return;
+    }
     try {
+      console.log(`💾 Saving ${items.length} items to localStorage (guest mode)`);
       localStorage.setItem(LOCAL_WISHLIST_KEY, JSON.stringify(items));
     } catch (err: any) {
       // Check if it's a quota error
