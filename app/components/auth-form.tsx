@@ -82,6 +82,8 @@ export function AuthForm({ onUserChange }: { onUserChange?: (user: any) => void 
       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
         <input
           type="email"
+          name="email"
+          autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="Your email"
