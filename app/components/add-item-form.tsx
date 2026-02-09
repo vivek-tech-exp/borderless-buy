@@ -45,22 +45,22 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
       <div className="flex flex-col sm:flex-row gap-4">
         <Input
           type="text"
-          placeholder="e.g., MacBook, camera, motorcycle…"
+          placeholder="What is the next thing you want to own? (e.g., MacBook Pro M4, Leica Q3...)"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           disabled={loading}
           className="min-w-0 flex-1"
         />
         <Button type="submit" disabled={loading} className="shrink-0 px-6">
-          {loading ? "Adding…" : "Add"}
+          {loading ? "Adding…" : "Add to Plan"}
         </Button>
       </div>
       {error && (
         <p className="text-sm text-red-400">{error}</p>
       )}
-      <p className="text-xs text-zinc-500 flex items-start gap-2">
-        <LightBulbIcon className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-zinc-600" />
-        <span>Sign in to keep your list forever. Your future self will thank you!</span>
+      <p className="text-xs text-[var(--text-tertiary)] flex items-start gap-2">
+        <LightBulbIcon className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" style={{color: 'var(--text-tertiary)'}} />
+        <span>Sign in to keep your upgrade plan forever. Your future self will thank you!</span>
       </p>
     </form>
   );

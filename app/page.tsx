@@ -148,10 +148,10 @@ export default function MainDashboard() {
         <div className="flex items-start justify-between gap-4 mb-8">
           <div className="flex-1">
             <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">
-              Borderless Buy
+              My Life Upgrade Plan
             </h1>
             <p className="mt-2 text-sm text-[var(--text-secondary)]">
-              Find the best deals worldwide. See what things cost in different countries and save big.
+              Unapologetically Materialistic. Intelligently Sourced.
             </p>
           </div>
           <div className="shrink-0 flex items-center gap-2">
@@ -202,7 +202,7 @@ export default function MainDashboard() {
           ) : (
             <div className="text-[var(--text-secondary)]">
               <span className="mr-1.5">💡</span>
-              Sign in to keep your list forever.
+              Keep your upgrade plan forever.
               <button
                 onClick={() => setShowSignInModal(true)}
                 className="ml-1.5 font-medium text-[var(--accent-primary)] hover:text-[var(--accent-hover)] transition-colors underline"
@@ -218,7 +218,7 @@ export default function MainDashboard() {
         <section className="mb-12 rounded-lg border p-4 flex items-start gap-3" style={{borderColor: 'var(--status-warning-border)', backgroundColor: 'var(--status-warning-bg)'}}>
           <BellAlertIcon className="h-5 w-5 mt-0.5 flex-shrink-0\" style={{color: 'var(--status-warning-border)'}} />
           <p className="text-sm" style={{color: 'var(--status-warning-text)'}}>
-            <span className="font-medium">Your wishlist is temporary.</span> Sign in to lock it in forever—it's free!
+            <span className="font-medium">Your upgrade plan is temporary.</span> Sign in to lock it in forever—it's free!
           </p>
         </section>
       )}
@@ -233,7 +233,7 @@ export default function MainDashboard() {
             <svg className="h-4 w-4" style={{color: 'var(--accent-primary)'}} fill="currentColor" viewBox="0 0 20 20">
               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.381-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
             </svg>
-            Your Wishlist
+            Your Upgrade Plan
           </h2>
           {items.length > 0 && (
             <div className="flex items-center gap-1">
@@ -265,15 +265,15 @@ export default function MainDashboard() {
               </div>
               <div className="space-y-2">
                 <h3 className="text-lg font-semibold text-[var(--text-primary)]">
-                  Ready to find better prices?
+                  Your list is empty.
                 </h3>
                 <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                  Add a product you&apos;re interested in — a MacBook, headphones, camera, or anything else — and we&apos;ll compare prices across 10 countries instantly.
+                  Start adding the things that matter to you. Whether it&apos;s a piece of tech, a vehicle, or a tool for your craft—let&apos;s find out what it really costs.
                 </p>
               </div>
               <button
                 onClick={() => {
-                  const input = document.querySelector('input[placeholder*="e.g."]') as HTMLInputElement;
+                  const input = document.querySelector('input[placeholder*="What"]') as HTMLInputElement;
                   input?.focus();
                 }}
                 className="text-sm font-medium transition-colors"
@@ -285,7 +285,7 @@ export default function MainDashboard() {
                   e.currentTarget.style.color = 'var(--accent-primary)';
                 }}
               >
-                Start comparing
+                Start adding
               </button>
             </div>
           </div>
@@ -309,9 +309,9 @@ export default function MainDashboard() {
       </section>
 
       <section className="mb-12">
-        <h2 className="mb-6 text-sm font-medium text-zinc-400 flex items-center gap-2">
-          <ChartPieIcon className="h-4 w-4 text-emerald-600" />
-          See prices across the world
+        <h2 className="mb-6 text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
+          <ChartPieIcon className="h-4 w-4" style={{color: 'var(--accent-primary)'}} />
+          Price Comparison Across Markets
         </h2>
         <AnalyticsPie items={chartItems} hoveredItemId={hoveredItemId} />
       </section>
@@ -319,9 +319,9 @@ export default function MainDashboard() {
       {showTotals && (
         <section className="mb-12">
           <div className="mb-6 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-medium text-zinc-400 flex items-center gap-2">
-              <CurrencyDollarIcon className="h-4 w-4 text-emerald-600" />
-              How much you&apos;d spend in each country
+            <h2 className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
+              <CurrencyDollarIcon className="h-4 w-4" style={{color: 'var(--accent-primary)'}} />
+              Total Acquisition Cost
             </h2>
             <button
               type="button"
@@ -362,9 +362,9 @@ export default function MainDashboard() {
               ))}
             </div>
             {bestTotal > 0 && (
-              <p className="mt-4 text-sm text-zinc-400">
-                🏆 Sweetest deal:{" "}
-                <span className="font-medium text-emerald-400">
+              <p className="mt-4 text-sm text-[var(--text-secondary)]">
+                💰 Cost to Satisfy:{" "}
+                <span className="font-medium" style={{color: 'var(--accent-primary)'}}>
                   {formatCurrency(bestTotal, preferredCurrency)}
                 </span>
               </p>

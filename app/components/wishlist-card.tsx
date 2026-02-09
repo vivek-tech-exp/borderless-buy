@@ -95,7 +95,12 @@ export function WishlistCard({
             <h3 className="text-lg font-semibold leading-snug" style={{color: 'var(--text-primary)'}}>
               {product.displayName}
             </h3>
-            <p className="text-xs mt-0.5" style={{color: 'var(--text-tertiary)'}}>{product.name}</p>
+            <div className="flex items-center gap-2 mt-1.5">
+              <p className="text-xs" style={{color: 'var(--text-tertiary)'}}>{product.name}</p>
+              <span className="inline-block px-2 py-0.5 text-xs rounded-full" style={{backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)'}}>
+                {product.carryOnFriendly ? "🌍 Global Asset" : "🏠 Local Purchase"}
+              </span>
+            </div>
           </div>
           {onRemove && (
             <button
@@ -119,7 +124,7 @@ export function WishlistCard({
         {best && (
           <div className="mb-5 p-4 rounded-xl border" style={{backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--accent-primary)', opacity: 0.8}}>
             <p className="text-xs uppercase tracking-wide font-medium mb-1" style={{color: 'var(--text-secondary)'}}>
-              Best Price
+              💰 Best Available Price
             </p>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold" style={{color: 'var(--accent-primary)'}}>
