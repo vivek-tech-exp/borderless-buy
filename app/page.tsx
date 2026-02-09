@@ -85,7 +85,13 @@ export default function MainDashboard() {
 
       try {
         const guestItems = JSON.parse(stored) as WishlistItem[];
-        if (guestItems.length === 0) return;
+        
+        // Even if empty, purge to mark as migrated
+        if (guestItems.length === 0) {
+          localStorage.removeItem(LOCAL_WISHLIST_KEY);
+          localStorage.removeItem("borderless-buy-income");
+          return;
+        }
 
         const {
           data: { session },
@@ -101,7 +107,12 @@ export default function MainDashboard() {
             body: JSON.stringify({ item }),
           });
         }
-        console.log(`Migrated ${guestItems.length} guest items to server`);
+        console.log(`✓ Migrated ${guestItems.length} guest items to server`);
+        
+        // IMMEDIATELY purge guest data after successful migration
+        localStorage.removeItem(LOCAL_WISHLIST_KEY);
+        localStorage.removeItem("borderless-buy-income");
+        console.log("✓ Purged guest localStorage after migration - data is now on server only");
       } catch (err) {
         console.warn("Failed to migrate guest data:", err);
       }
@@ -113,18 +124,10 @@ export default function MainDashboard() {
         // User signed in: migrate guest data first, then load from server
         migrateGuestDataToServer().then(() => load());
       } else {
-        // User signed out: try to load guest data from localStorage
-        const stored = localStorage.getItem(LOCAL_WISHLIST_KEY);
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored) as WishlistItem[];
-            setItems(parsed);
-          } catch {
-            setItems([]);
-          }
-        } else {
-          setItems([]);
-        }
+        // User signed out: start fresh (don't restore guest data)
+        // Even if guest data exists in localStorage, we don't use it
+        // Users who were migrated should see empty state until they sign back in
+        setItems([]);
       }
     });
     return () => sub.subscription.unsubscribe();
