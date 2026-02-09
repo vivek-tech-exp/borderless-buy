@@ -21,6 +21,7 @@ export default function MainDashboard() {
   const [lastPrompt, setLastPrompt] = useState<string | null>(null);
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [totalsExpanded, setTotalsExpanded] = useState(true);
 
   const { convertToPreferred, preferredCurrency } = useCurrency();
 
@@ -52,6 +53,15 @@ export default function MainDashboard() {
       if (!session?.user) setItems([]);
     });
     return () => sub.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mediaQuery = window.matchMedia("(min-width: 640px)");
+    const setDefault = () => setTotalsExpanded(mediaQuery.matches);
+    setDefault();
+    mediaQuery.addEventListener("change", setDefault);
+    return () => mediaQuery.removeEventListener("change", setDefault);
   }, []);
 
   const handleAdd = useCallback(async (item: WishlistItem, prompt?: string) => {
@@ -184,53 +194,6 @@ export default function MainDashboard() {
         <AddItemForm onAdd={handleAdd} />
       </section>
 
-      {showTotals && (
-        <section className="mb-8">
-          <h2 className="mb-4 text-sm font-medium text-zinc-400">
-            💰 How much you'd spend in each country
-          </h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {totalsByCountry.map(({ code, label, total }) => (
-              <div
-                key={code}
-                className="rounded-xl border border-zinc-700/80 bg-zinc-900/80 px-3 py-3 min-h-[100px] flex flex-col justify-between"
-              >
-                <div className="min-w-0">
-                  <span
-                    className="mb-1 block h-1.5 w-1.5 rounded-full"
-                    style={{ backgroundColor: ITEM_CHART_COLORS[code] }}
-                    aria-hidden
-                  />
-                  <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 truncate">
-                    {label}
-                  </p>
-                </div>
-                <p className="mt-2 text-base font-semibold tabular-nums text-zinc-100 break-words">
-                  {total > 0
-                    ? formatCurrency(total, preferredCurrency)
-                    : "—"}
-                </p>
-              </div>
-            ))}
-          </div>
-          {bestTotal > 0 && (
-            <p className="mt-4 text-sm text-zinc-400">
-              🏆 Sweetest deal:{" "}
-              <span className="font-medium text-emerald-400">
-                {formatCurrency(bestTotal, preferredCurrency)}
-              </span>
-            </p>
-          )}
-        </section>
-      )}
-
-      <section className="mb-8">
-        <h2 className="mb-4 text-sm font-medium text-zinc-400">
-          📊 See prices across the world
-        </h2>
-        <AnalyticsPie items={chartItems} hoveredItemId={hoveredItemId} />
-      </section>
-
       <section>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-medium text-zinc-400">✨ Your Wishlist</h2>
@@ -276,6 +239,69 @@ export default function MainDashboard() {
           </ul>
         )}
       </section>
+
+      <section className="mb-8">
+        <h2 className="mb-4 text-sm font-medium text-zinc-400">
+          📊 See prices across the world
+        </h2>
+        <AnalyticsPie items={chartItems} hoveredItemId={hoveredItemId} />
+      </section>
+
+      {showTotals && (
+        <section className="mb-8">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-medium text-zinc-400">
+              💰 How much you'd spend in each country
+            </h2>
+            <button
+              type="button"
+              onClick={() => setTotalsExpanded((prev) => !prev)}
+              className="rounded-md px-2.5 py-1 text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 sm:hidden"
+              aria-expanded={totalsExpanded}
+              aria-controls="totals-panel"
+            >
+              {totalsExpanded ? "Hide" : "Show"}
+            </button>
+          </div>
+          <div
+            id="totals-panel"
+            className={`${totalsExpanded ? "block" : "hidden"} sm:block`}
+          >
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+              {totalsByCountry.map(({ code, label, total }) => (
+                <div
+                  key={code}
+                  className="rounded-xl border border-zinc-700/80 bg-zinc-900/80 px-3 py-3 min-h-[100px] flex flex-col justify-between"
+                >
+                  <div className="min-w-0">
+                    <span
+                      className="mb-1 block h-1.5 w-1.5 rounded-full"
+                      style={{ backgroundColor: ITEM_CHART_COLORS[code] }}
+                      aria-hidden
+                    />
+                    <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 truncate">
+                      {label}
+                    </p>
+                  </div>
+                  <p className="mt-2 text-base font-semibold tabular-nums text-zinc-100 break-words">
+                    {total > 0
+                      ? formatCurrency(total, preferredCurrency)
+                      : "—"}
+                  </p>
+                </div>
+              ))}
+            </div>
+            {bestTotal > 0 && (
+              <p className="mt-4 text-sm text-zinc-400">
+                🏆 Sweetest deal:{" "}
+                <span className="font-medium text-emerald-400">
+                  {formatCurrency(bestTotal, preferredCurrency)}
+                </span>
+              </p>
+            )}
+          </div>
+        </section>
+      )}
 
       {showPromptModal && (
         <PromptInfoModal
