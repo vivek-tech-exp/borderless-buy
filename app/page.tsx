@@ -127,7 +127,7 @@ export default function MainDashboard() {
   const totalsByCountry = COUNTRY_CODES.map((code) => {
     const total = selectedItems.reduce((sum, item) => {
       const p = item.product.pricing[code];
-      if (!p) return sum;
+      if (!p || p.price === null) return sum;
       return sum + convertToPreferred(p.price, p.currency);
     }, 0);
     return { code, label: COUNTRY_LABELS[code], total };
