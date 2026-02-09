@@ -91,3 +91,52 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const auth = request.headers.get("authorization") ?? "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth || undefined;
+    if (!token) return NextResponse.json({ error: "Missing access token" }, { status: 401 });
+
+    const userId = verifyTokenAndGetUserId(token);
+    if (!userId) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+
+    const url = new URL(request.url);
+    const itemId = url.searchParams.get("id");
+    if (!itemId) {
+      return NextResponse.json({ error: "Missing item id" }, { status: 400 });
+    }
+
+    const supabase = makeAdminClient();
+    
+    // First verify the item belongs to this user
+    const { data: existing, error: selectError } = await supabase
+      .from("wishlist")
+      .select("id")
+      .eq("id", itemId)
+      .eq("user_id", userId)
+      .single();
+
+    if (selectError || !existing) {
+      // Either item doesn't exist or doesn't belong to user (permission denied)
+      return NextResponse.json({ error: "Item not found or unauthorized" }, { status: 404 });
+    }
+
+    // Delete the item
+    const { error: deleteError } = await supabase
+      .from("wishlist")
+      .delete()
+      .eq("id", itemId)
+      .eq("user_id", userId);
+
+    if (deleteError) {
+      console.error("DELETE /api/wishlist error:", deleteError.message);
+      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    console.error("DELETE /api/wishlist exception:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}

@@ -99,20 +99,58 @@ export default function MainDashboard() {
         const token = session?.access_token;
         if (!token) return;
 
-        // Upload each guest item to server
+        // Upload each guest item to server with retry logic
+        let successCount = 0;
+        let failureCount = 0;
+
         for (const item of guestItems) {
-          await fetch("/api/wishlist", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ item }),
-          });
+          let uploaded = false;
+          
+          // Retry up to 3 times with exponential backoff
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const res = await fetch("/api/wishlist", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ item }),
+              });
+
+              if (res.ok) {
+                uploaded = true;
+                successCount++;
+                break;
+              } else if (res.status === 409) {
+                // Item already exists (duplicate), mark as success
+                uploaded = true;
+                successCount++;
+                break;
+              } else if (attempt < 2) {
+                // Retry with exponential backoff (100ms, 200ms)
+                await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 100));
+              }
+            } catch (err) {
+              if (attempt < 2) {
+                // Network error, retry
+                await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 100));
+              }
+            }
+          }
+
+          if (!uploaded) {
+            failureCount++;
+            console.warn(`Failed to migrate item "${item.product.displayName}" after 3 attempts`);
+          }
         }
-        console.log(`✓ Migrated ${guestItems.length} guest items to server`);
-        
-        // IMMEDIATELY purge guest data after successful migration
+
+        console.log(
+          `✓ Migration complete: ${successCount}/${guestItems.length} items uploaded` +
+          (failureCount > 0 ? `, ${failureCount} failed` : "")
+        );
+
+        // IMMEDIATELY purge guest data after migration (success or partial)
         localStorage.removeItem(LOCAL_WISHLIST_KEY);
         localStorage.removeItem("borderless-buy-income");
-        console.log("✓ Purged guest localStorage after migration - data is now on server only");
+        console.log("✓ Purged guest localStorage after migration - data is now on server");
       } catch (err) {
         console.warn("Failed to migrate guest data:", err);
       }
@@ -156,6 +194,9 @@ export default function MainDashboard() {
   }, []);
 
   const handleAdd = useCallback(async (item: WishlistItem, prompt?: string) => {
+    // Save current state for rollback if needed
+    const previousItems = items;
+    
     // Optimistically add locally
     setItems((prev) => [item, ...prev]);
     setSelectedIds((prev) => new Set(prev).add(item.id));
@@ -167,20 +208,36 @@ export default function MainDashboard() {
         data: { session },
       } = await supabase.auth.getSession();
       const token = session?.access_token;
-      if (!token) return;
+      if (!token) return; // Guest user, item stays in localStorage only
+      
       const res = await fetch("/api/wishlist", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ item }),
       });
+      
       if (!res.ok) {
         const data = await res.json();
+        // Rollback on error
+        setItems(previousItems);
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(item.id);
+          return next;
+        });
         console.warn("Failed to persist wishlist item:", data.error ?? res.statusText);
       }
     } catch (err) {
+      // Rollback on error
+      setItems(previousItems);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
       console.warn("Error saving item to server:", err);
     }
-  }, []);
+  }, [items]);
 
   const handleRemove = useCallback((id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
@@ -190,7 +247,29 @@ export default function MainDashboard() {
       return next;
     });
     if (hoveredItemId === id) setHoveredItemId(null);
-  }, [hoveredItemId]);
+
+    // If user is signed in, delete from server too
+    if (user) {
+      (async () => {
+        try {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+          const token = session?.access_token;
+          if (!token) return;
+          const res = await fetch(`/api/wishlist?id=${id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) {
+            console.warn("Failed to delete item from server:", res.statusText);
+          }
+        } catch (err) {
+          console.warn("Error deleting item from server:", err);
+        }
+      })();
+    }
+  }, [hoveredItemId, user]);
 
   const handleToggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -230,8 +309,16 @@ export default function MainDashboard() {
     if (user) return;
     try {
       localStorage.setItem(LOCAL_WISHLIST_KEY, JSON.stringify(items));
-    } catch {
-      // If storage fails (quota or private mode), silently skip.
+    } catch (err: any) {
+      // Check if it's a quota error
+      if (err?.name === "QuotaExceededError") {
+        console.error("⚠️ localStorage quota exceeded: cannot save all items");
+        // Could set a state to show warning to user, but keeping silent for now
+        // Future: Add warning banner
+      } else {
+        // Other errors (private mode, etc)
+        console.debug("localStorage unavailable:", err?.message);
+      }
     }
   }, [items, user]);
 
@@ -260,10 +347,24 @@ export default function MainDashboard() {
           setIncomeInput("");
         }
       }
+      
+      // Sync wishlist items across tabs for guest users
+      if (e.key === LOCAL_WISHLIST_KEY && !user) {
+        if (e.newValue) {
+          try {
+            const updatedItems = JSON.parse(e.newValue) as WishlistItem[];
+            setItems(updatedItems);
+          } catch {
+            console.warn("Failed to parse synced wishlist items");
+          }
+        } else {
+          setItems([]);
+        }
+      }
     };
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+  }, [user]);
 
   const selectedItems = items.filter((i) => selectedIds.has(i.id));
   const chartItems =
