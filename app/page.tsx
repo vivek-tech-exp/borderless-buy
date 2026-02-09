@@ -5,7 +5,7 @@ import { GlobeAltIcon, ChartPieIcon, CurrencyDollarIcon, BellAlertIcon } from "@
 import { AddItemForm } from "@/app/components/add-item-form";
 import { WishlistCard } from "@/app/components/wishlist-card";
 import { AnalyticsPie } from "@/app/components/analytics-pie";
-import { CurrencySetting } from "@/app/components/currency-setting";
+import { CountryFlagSelector } from "@/app/components/country-flag-selector";
 import { PromptInfoModal } from "@/app/components/prompt-info-modal";
 import { useCurrency } from "@/app/lib/currency-context";
 import { supabase } from "@/app/lib/supabase";
@@ -142,20 +142,24 @@ export default function MainDashboard() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
       <header className="mb-12">
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex flex-1 items-start justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold tracking-tight text-zinc-100">
-                Borderless Buy
-              </h1>
-              <p className="mt-2 text-sm text-zinc-400">
-                Find the best deals worldwide. See what things cost in different countries and save big.
-              </p>
-            </div>
+        {/* Hero Section: Logo + Tagline + Currency + Info Button */}
+        <div className="flex items-start justify-between gap-4 mb-8">
+          <div className="flex-1">
+            <h1 className="text-3xl font-bold tracking-tight text-zinc-100">
+              Borderless Buy
+            </h1>
+            <p className="mt-2 text-sm text-zinc-400">
+              Find the best deals worldwide. See what things cost in different countries and save big.
+            </p>
+          </div>
+          <div className="shrink-0 flex items-center gap-2">
+            {/* Compact flag-based country selector */}
+            <CountryFlagSelector />
+            {/* Info button (desktop only - dev tool) */}
             <button
               type="button"
               onClick={() => setShowPromptModal(true)}
-              className="shrink-0 rounded-full p-2 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+              className="hidden sm:flex shrink-0 rounded-full p-2 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
               title="View last Gemini prompt"
               aria-label="View last Gemini prompt"
             >
@@ -174,13 +178,10 @@ export default function MainDashboard() {
               </svg>
             </button>
           </div>
-          <div className="shrink-0 flex items-center gap-3">
-            <AuthForm onUserChange={setUser} />
-            <div className="sm:w-40">
-              <CurrencySetting />
-            </div>
-          </div>
         </div>
+
+        {/* Auth Section: Clean, Focused */}
+        <AuthForm onUserChange={setUser} />
       </header>
 
       {items.length > 0 && !user && (

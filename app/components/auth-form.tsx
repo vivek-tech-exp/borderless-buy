@@ -55,35 +55,37 @@ export function AuthForm({ onUserChange }: { onUserChange?: (user: any) => void 
 
   if (user) {
     return (
-      <div className="flex items-center gap-2">
-        <div className="text-xs text-zinc-400">👋 Hey,</div>
-        <div className="text-sm font-medium text-zinc-100 truncate">{user.email ?? user.phone ?? user.id}</div>
+      <div className="flex items-center gap-3">
+        <div className="text-sm text-zinc-400">Welcome,</div>
+        <div className="text-sm font-medium text-zinc-100 truncate max-w-xs">{user.email ?? user.phone ?? user.id}</div>
         <button
           onClick={signOut}
-          className="ml-2 rounded-md bg-zinc-800 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-700"
+          className="rounded-[12px] border border-zinc-700 bg-zinc-900 px-4 py-2 text-xs font-medium text-zinc-200 hover:bg-zinc-800 transition-colors"
         >
-          Exit
+          Sign out
         </button>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="Your email"
-        className="rounded-md bg-zinc-900 border border-zinc-700 px-2 py-1 text-sm text-zinc-100"
-      />
-      <button
-        onClick={signIn}
-        disabled={loading}
-        className="rounded-md bg-emerald-500 px-3 py-1 text-sm font-medium text-zinc-900 hover:opacity-90"
-      >
-        {loading ? "Sending…" : "Sign in"}
-      </button>
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Your email"
+          className="h-12 flex-1 rounded-[12px] bg-zinc-900 border border-zinc-700 px-4 py-3 text-sm text-white placeholder:text-zinc-600 transition-all duration-200 focus-visible:outline-none focus-visible:border-emerald-600 focus-visible:ring-4 focus-visible:ring-emerald-500/20 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-zinc-950"
+        />
+        <button
+          onClick={signIn}
+          disabled={loading}
+          className="h-12 shrink-0 rounded-[12px] bg-emerald-600 px-6 text-sm font-medium uppercase tracking-wide text-white transition-all duration-200 hover:bg-emerald-700 active:bg-emerald-800 disabled:opacity-50 disabled:cursor-not-allowed sm:whitespace-nowrap"
+        >
+          {loading ? "Sending…" : "Sign in"}
+        </button>
+      </div>
       {message && <div className="text-xs text-zinc-400">{message}</div>}
     </div>
   );
