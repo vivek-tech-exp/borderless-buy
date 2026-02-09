@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CheckCircleIcon, XCircleIcon, ClockIcon, LightBulbIcon, TrashIcon } from "@heroicons/react/24/outline";
 import type { WishlistItem, CountryCode } from "@/types";
 import { COUNTRY_CODES, COUNTRY_LABELS } from "@/types";
 import { useCurrency } from "@/app/lib/currency-context";
@@ -99,13 +100,11 @@ export function WishlistCard({
             <button
               type="button"
               onClick={() => onRemove(item.id)}
-              className="shrink-0 text-zinc-600 hover:text-red-400 transition-colors"
+              className="shrink-0 text-zinc-600 hover:text-red-400 transition-colors p-1"
               title="Remove item"
               aria-label="Remove"
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
+              <TrashIcon className="w-5 h-5" />
             </button>
           )}
         </div>
@@ -215,14 +214,32 @@ export function WishlistCard({
                         {row.priceSource && ` • ${row.priceSource}`}
                       </p>
                       {row.stockStatus && row.stockStatus !== "unknown" && (
-                        <p className="text-xs text-zinc-600 mt-1">
-                          {row.stockStatus === "in_stock" && "✓ In stock"}
-                          {row.stockStatus === "out_of_stock" && "✗ Out of stock"}
-                          {row.stockStatus === "preorder" && "⏳ Preorder"}
-                        </p>
+                        <div className="flex items-center gap-2 mt-1 text-xs">
+                          {row.stockStatus === "in_stock" && (
+                            <>
+                              <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0" />
+                              <span className="text-zinc-500">In stock</span>
+                            </>
+                          )}
+                          {row.stockStatus === "out_of_stock" && (
+                            <>
+                              <XCircleIcon className="h-3.5 w-3.5 text-red-600 flex-shrink-0" />
+                              <span className="text-zinc-500">Out of stock</span>
+                            </>
+                          )}
+                          {row.stockStatus === "preorder" && (
+                            <>
+                              <ClockIcon className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
+                              <span className="text-zinc-500">Preorder</span>
+                            </>
+                          )}
+                        </div>
                       )}
                       {row.notes && (
-                        <p className="text-xs text-amber-600 mt-1">💡 {row.notes}</p>
+                        <div className="flex items-start gap-2 mt-2">
+                          <LightBulbIcon className="h-3.5 w-3.5 mt-0.5 text-amber-600 flex-shrink-0" />
+                          <p className="text-xs text-amber-600">{row.notes}</p>
+                        </div>
                       )}
                       {row.buyingLink && (
                         <a
