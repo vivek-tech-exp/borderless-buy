@@ -3,11 +3,80 @@
 @tailwind utilities;
 
 :root {
-  --background: #0a0a0a;
-  --foreground: #fafafa;
+  /* Light theme defaults */
+  
+  /* Backgrounds */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f8f8;
+  --bg-tertiary: #f0f0f0;
+  
+  /* Text */
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  --text-inverse: #ffffff;
+  
+  /* Borders */
+  --border-primary: #e5e5e5;
+  --border-secondary: #d9d9d9;
+  
+  /* Accent Colors (Emerald) */
+  --accent-primary: #059669;
+  --accent-hover: #047857;
+  --accent-active: #065f46;
+  --accent-light: #d1fae5;
+  
+  /* Button Primary */
+  --btn-primary-bg: #059669;
+  --btn-primary-text: #ffffff;
+  --btn-primary-hover: #047857;
+  --btn-primary-active: #065f46;
+  --btn-primary-disabled: #d1d5db;
+  
+  /* Button Secondary */
+  --btn-secondary-bg: #f3f4f6;
+  --btn-secondary-text: #1a1a1a;
+  --btn-secondary-hover: #e5e7eb;
+  --btn-secondary-active: #d1d5db;
+  --btn-secondary-border: #d1d5db;
+  
+  /* Input */
+  --input-bg: #ffffff;
+  --input-border: #d9d9d9;
+  --input-border-focus: #059669;
+  --input-text: #1a1a1a;
+  --input-placeholder: #9ca3af;
+  --input-ring: #d1fae5;
+  
+  /* Card */
+  --card-bg: #ffffff;
+  --card-border: #e5e5e5;
+  --card-hover: #f8f8f8;
+  
+  /* Status Colors */
+  --status-success-bg: #ecfdf5;
+  --status-success-text: #065f46;
+  --status-success-border: #a7f3d0;
+  
+  --status-warning-bg: #fffbeb;
+  --status-warning-text: #92400e;
+  --status-warning-border: #fcd34d;
+  
+  --status-error-bg: #fef2f2;
+  --status-error-text: #991b1b;
+  --status-error-border: #fca5a5;
+  
+  --status-info-bg: #eff6ff;
+  --status-info-text: #1e40af;
+  --status-info-border: #93c5fd;
+  
+  /* Special */
+  --overlay: rgba(0, 0, 0, 0.5);
+  --divider: #f3f4f6;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
 }
+

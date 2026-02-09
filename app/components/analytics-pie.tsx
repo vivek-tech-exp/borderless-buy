@@ -69,7 +69,7 @@ export function AnalyticsPie({ items, hoveredItemId }: AnalyticsPieProps) {
 
   if (data.length === 0) {
     return (
-      <div className="flex h-[260px] items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900/50 text-sm text-zinc-500">
+      <div className="flex h-[260px] items-center justify-center rounded-xl border text-sm" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-tertiary)'}}>
         {hoveredItemId ? "Hover an item to see it here" : "Select items to see your wishlist breakdown"}
       </div>
     );
@@ -79,12 +79,12 @@ export function AnalyticsPie({ items, hoveredItemId }: AnalyticsPieProps) {
     <div className="w-full">
       <div className="mb-3 flex items-end justify-between gap-4">
         <div>
-          <div className="text-xs text-zinc-400">Optimized total</div>
-          <div className="text-lg font-semibold text-emerald-400">{formatCurrency(optimizedTotal, preferredCurrency)}</div>
+          <div className="text-xs" style={{color: 'var(--text-secondary)'}}>Optimized total</div>
+          <div className="text-lg font-semibold" style={{color: 'var(--accent-primary)'}}>{formatCurrency(optimizedTotal, preferredCurrency)}</div>
         </div>
         <div className="text-right">
-          <div className="text-xs text-zinc-400">If bought from {preferredCountry}</div>
-          <div className="text-lg font-semibold text-zinc-100">{formatCurrency(homeTotal, preferredCurrency)}</div>
+          <div className="text-xs" style={{color: 'var(--text-secondary)'}}>If bought from {preferredCountry}</div>
+          <div className="text-lg font-semibold" style={{color: 'var(--text-primary)'}}>{formatCurrency(homeTotal, preferredCurrency)}</div>
         </div>
       </div>
 

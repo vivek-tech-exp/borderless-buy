@@ -87,20 +87,24 @@ export function WishlistCard({
             type="checkbox"
             checked={selected}
             onChange={() => onToggleSelect(item.id)}
-            className="mt-1 h-5 w-5 rounded border-zinc-600 bg-zinc-800 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+            className="mt-1 h-5 w-5 rounded cursor-pointer"
+            style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--input-bg)', color: 'var(--accent-primary)'}}
             aria-label={`Select ${product.displayName}`}
           />
           <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-semibold text-zinc-100 leading-snug">
+            <h3 className="text-lg font-semibold leading-snug" style={{color: 'var(--text-primary)'}}>
               {product.displayName}
             </h3>
-            <p className="text-xs text-zinc-500 mt-0.5">{product.name}</p>
+            <p className="text-xs mt-0.5" style={{color: 'var(--text-tertiary)'}}>{product.name}</p>
           </div>
           {onRemove && (
             <button
               type="button"
               onClick={() => onRemove(item.id)}
-              className="shrink-0 text-zinc-600 hover:text-red-400 transition-colors p-1"
+              className="shrink-0 transition-colors p-1"
+              style={{color: 'var(--text-tertiary)'}}
+              onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
               title="Remove item"
               aria-label="Remove"
             >
@@ -113,15 +117,15 @@ export function WishlistCard({
       <CardContent className="pt-0">
         {/* Best Price Highlight */}
         {best && (
-          <div className="mb-5 p-4 rounded-xl bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 border border-emerald-500/30">
-            <p className="text-xs text-zinc-500 uppercase tracking-wide font-medium mb-1">
+          <div className="mb-5 p-4 rounded-xl border" style={{backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--accent-primary)', opacity: 0.8}}>
+            <p className="text-xs uppercase tracking-wide font-medium mb-1" style={{color: 'var(--text-secondary)'}}>
               Best Price
             </p>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-emerald-400">
+              <span className="text-3xl font-bold" style={{color: 'var(--accent-primary)'}}>
                 {formatCurrency(best.convertedPrice, preferredCurrency, { maxFractionDigits: 0 })}
               </span>
-              <span className="text-sm text-zinc-400">
+              <span className="text-sm" style={{color: 'var(--text-secondary)'}}>
                 in {best.label}
               </span>
             </div>
@@ -138,11 +142,12 @@ export function WishlistCard({
             return (
               <div
                 key={row.code}
-                className={`p-3 rounded-lg border transition-all ${
-                  isBest
-                    ? "border-emerald-500/50 bg-emerald-500/10"
-                    : "border-zinc-700/50 bg-zinc-800/50 hover:border-zinc-600/70 hover:bg-zinc-800/70"
-                }`}
+                className="p-3 rounded-lg border transition-all"
+                style={{
+                  backgroundColor: isBest ? 'var(--bg-secondary)' : 'var(--bg-secondary)',
+                  borderColor: isBest ? 'var(--accent-primary)' : 'var(--border-primary)',
+                  opacity: isBest ? 0.9 : 1,
+                }}
               >
                 <div className="flex items-center gap-1.5 mb-2">
                   <span
@@ -150,19 +155,17 @@ export function WishlistCard({
                     style={{ backgroundColor: color }}
                     aria-hidden
                   />
-                  <span className="text-xs font-medium text-zinc-400 truncate">
+                  <span className="text-xs font-medium truncate" style={{color: 'var(--text-secondary)'}}>
                     {row.label}
                   </span>
                 </div>
-                <p className={`text-sm font-semibold tabular-nums ${
-                  hasPrice ? "text-zinc-100" : "text-zinc-600"
-                }`}>
+                <p className="text-sm font-semibold tabular-nums" style={{color: hasPrice ? 'var(--text-primary)' : 'var(--text-tertiary)'}}>
                   {hasPrice
                     ? formatCurrency(row.convertedPrice!, preferredCurrency, { maxFractionDigits: 0 })
                     : "Not available"}
                 </p>
                 {row.stockStatus && row.stockStatus !== "unknown" && (
-                  <p className="text-[10px] text-zinc-500 mt-1">
+                  <p className="text-[10px] mt-1" style={{color: 'var(--text-tertiary)'}}>
                     {row.stockStatus === "in_stock" && "✓ In stock"}
                     {row.stockStatus === "out_of_stock" && "✗ Out of stock"}
                     {row.stockStatus === "preorder" && "⏳ Preorder"}
@@ -173,7 +176,11 @@ export function WishlistCard({
                     href={row.buyingLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[11px] text-emerald-500 hover:text-emerald-400 transition-colors mt-1.5 inline-block"
+                    className="text-[11px] transition-colors mt-1.5 inline-block"
+                    style={{color: 'var(--accent-primary)'}}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+
                   >
                     Shop →
                   </a>
@@ -187,7 +194,10 @@ export function WishlistCard({
         <button
           type="button"
           onClick={() => setShowDetails(!showDetails)}
-          className="w-full text-xs text-zinc-500 hover:text-zinc-400 transition-colors py-2 text-center border-t border-zinc-800/50 mt-2 -mx-4 -mb-4 px-4"
+          className="w-full text-xs transition-colors py-2 text-center border-t mt-2 -mx-4 -mb-4 px-4"
+          style={{borderColor: 'var(--border-primary)', color: 'var(--text-tertiary)'}}
+          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
         >
           {showDetails ? "Hide details" : "View all prices & sources"}
         </button>

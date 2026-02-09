@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { CurrencyProvider } from "@/app/lib/currency-context";
+import { ThemeProvider } from "@/app/lib/theme-context";
 
 export const metadata: Metadata = {
   title: "Borderless Buy — Compare prices across 6 countries",
@@ -15,8 +16,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-[var(--background)] font-sans antialiased">
-        <CurrencyProvider>{children}</CurrencyProvider>
+      <body className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] font-sans antialiased transition-colors duration-300">
+        <ThemeProvider>
+          <CurrencyProvider>{children}</CurrencyProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

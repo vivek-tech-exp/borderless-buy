@@ -7,9 +7,10 @@ import { WishlistCard } from "@/app/components/wishlist-card";
 import { AnalyticsPie } from "@/app/components/analytics-pie";
 import { CountryFlagSelector } from "@/app/components/country-flag-selector";
 import { PromptInfoModal } from "@/app/components/prompt-info-modal";
+import { ThemeSwitcher } from "@/app/components/theme-switcher";
 import { useCurrency } from "@/app/lib/currency-context";
 import { supabase } from "@/app/lib/supabase";
-import { AuthForm } from "@/app/components/auth-form";
+import { SignInModal } from "@/app/components/sign-in-modal";
 import { COUNTRY_CODES, COUNTRY_LABELS } from "@/types";
 import { ITEM_CHART_COLORS } from "@/app/lib/constants";
 import { formatCurrency } from "@/app/lib/utils";
@@ -21,6 +22,7 @@ export default function MainDashboard() {
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
   const [lastPrompt, setLastPrompt] = useState<string | null>(null);
   const [showPromptModal, setShowPromptModal] = useState(false);
+  const [showSignInModal, setShowSignInModal] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [totalsExpanded, setTotalsExpanded] = useState(true);
 
@@ -145,21 +147,23 @@ export default function MainDashboard() {
         {/* Hero Section: Logo + Tagline + Currency + Info Button */}
         <div className="flex items-start justify-between gap-4 mb-8">
           <div className="flex-1">
-            <h1 className="text-3xl font-bold tracking-tight text-zinc-100">
+            <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">
               Borderless Buy
             </h1>
-            <p className="mt-2 text-sm text-zinc-400">
+            <p className="mt-2 text-sm text-[var(--text-secondary)]">
               Find the best deals worldwide. See what things cost in different countries and save big.
             </p>
           </div>
           <div className="shrink-0 flex items-center gap-2">
             {/* Compact flag-based country selector */}
             <CountryFlagSelector />
+            {/* Theme switcher */}
+            <ThemeSwitcher />
             {/* Info button (desktop only - dev tool) */}
             <button
               type="button"
               onClick={() => setShowPromptModal(true)}
-              className="hidden sm:flex shrink-0 rounded-full p-2 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+              className="hidden sm:flex shrink-0 rounded-full p-2 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-secondary)]\"
               title="View last Gemini prompt"
               aria-label="View last Gemini prompt"
             >
@@ -180,14 +184,40 @@ export default function MainDashboard() {
           </div>
         </div>
 
-        {/* Auth Section: Clean, Focused */}
-        <AuthForm onUserChange={setUser} />
+        {/* Sign-in prompt - subtle and elegant */}
+        <div className="flex items-center justify-center gap-2 text-sm">
+          {user ? (
+            <div className="flex items-center gap-3 px-4 py-2 rounded-[12px] bg-[var(--bg-secondary)] border border-[var(--border-primary)]">
+              <div className="text-[var(--text-secondary)]">Signed in as</div>
+              <div className="font-medium text-[var(--text-primary)] truncate max-w-[200px]">
+                {user.email ?? user.phone ?? user.id}
+              </div>
+              <button
+                onClick={() => setShowSignInModal(true)}
+                className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+              >
+                Manage
+              </button>
+            </div>
+          ) : (
+            <div className="text-[var(--text-secondary)]">
+              <span className="mr-1.5">💡</span>
+              Sign in to keep your list forever.
+              <button
+                onClick={() => setShowSignInModal(true)}
+                className="ml-1.5 font-medium text-[var(--accent-primary)] hover:text-[var(--accent-hover)] transition-colors underline"
+              >
+                Sign in
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       {items.length > 0 && !user && (
-        <section className="mb-12 rounded-lg border border-amber-900 bg-amber-950/50 p-4 flex items-start gap-3">
-          <BellAlertIcon className="h-5 w-5 mt-0.5 text-amber-600 flex-shrink-0" />
-          <p className="text-sm text-amber-100">
+        <section className="mb-12 rounded-lg border p-4 flex items-start gap-3" style={{borderColor: 'var(--status-warning-border)', backgroundColor: 'var(--status-warning-bg)'}}>
+          <BellAlertIcon className="h-5 w-5 mt-0.5 flex-shrink-0\" style={{color: 'var(--status-warning-border)'}} />
+          <p className="text-sm" style={{color: 'var(--status-warning-text)'}}>
             <span className="font-medium">Your wishlist is temporary.</span> Sign in to lock it in forever—it's free!
           </p>
         </section>
@@ -199,8 +229,8 @@ export default function MainDashboard() {
 
       <section className="mb-12">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-medium text-zinc-400 flex items-center gap-2">
-            <svg className="h-4 w-4 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+          <h2 className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
+            <svg className="h-4 w-4" style={{color: 'var(--accent-primary)'}} fill="currentColor" viewBox="0 0 20 20">
               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.381-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
             </svg>
             Your Wishlist
@@ -210,15 +240,15 @@ export default function MainDashboard() {
               <button
                 type="button"
                 onClick={selectAll}
-                className="rounded-md px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+                className="rounded-md px-3 py-1.5 text-xs text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-secondary)]"
               >
                 Pick all
               </button>
-              <span className="text-zinc-600" aria-hidden>·</span>
+              <span className="text-[var(--border-primary)]" aria-hidden>·</span>
               <button
                 type="button"
                 onClick={deselectAll}
-                className="rounded-md px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+                className="rounded-md px-3 py-1.5 text-xs text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-secondary)]"
               >
                 Clear all
               </button>
@@ -226,18 +256,18 @@ export default function MainDashboard() {
           )}
         </div>
         {items.length === 0 ? (
-          <div className="relative rounded-[12px] border border-zinc-700 bg-gradient-to-br from-zinc-900 via-zinc-950 to-black px-6 py-16 text-center shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+          <div className="relative rounded-[12px] border px-6 py-16 text-center" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
             <div className="mx-auto max-w-sm space-y-6">
               <div className="flex justify-center">
-                <div className="h-12 w-12 rounded-full border-2 border-emerald-600/30 flex items-center justify-center">
-                  <div className="h-6 w-6 rounded-full bg-emerald-600/20" />
+                <div className="h-12 w-12 rounded-full border-2 flex items-center justify-center" style={{borderColor: 'var(--accent-primary)', opacity: 0.3}}>
+                  <div className="h-6 w-6 rounded-full" style={{backgroundColor: 'var(--accent-primary)', opacity: 0.2}} />
                 </div>
               </div>
               <div className="space-y-2">
-                <h3 className="text-lg font-semibold text-white">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">
                   Ready to find better prices?
                 </h3>
-                <p className="text-sm text-zinc-400 leading-relaxed">
+                <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
                   Add a product you&apos;re interested in — a MacBook, headphones, camera, or anything else — and we&apos;ll compare prices across 10 countries instantly.
                 </p>
               </div>
@@ -246,7 +276,14 @@ export default function MainDashboard() {
                   const input = document.querySelector('input[placeholder*="e.g."]') as HTMLInputElement;
                   input?.focus();
                 }}
-                className="text-sm font-medium text-emerald-600 hover:text-emerald-500 transition-colors"
+                className="text-sm font-medium transition-colors"
+                style={{color: 'var(--accent-primary)'}}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'var(--accent-hover)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'var(--accent-primary)';
+                }}
               >
                 Start comparing
               </button>
@@ -342,6 +379,12 @@ export default function MainDashboard() {
           onClose={() => setShowPromptModal(false)}
         />
       )}
+
+      <SignInModal
+        isOpen={showSignInModal}
+        onClose={() => setShowSignInModal(false)}
+        onUserChange={setUser}
+      />
     </main>
   );
 }
