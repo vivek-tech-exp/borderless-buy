@@ -37,7 +37,7 @@ const defaultRates: RatesState = {
 const CurrencyContext = createContext<CurrencyContextValue | null>(null);
 
 const STORAGE_KEY = PREFERRED_CURRENCY_KEY;
-const DEFAULT_COUNTRY: CountryCode = "IN";
+const DEFAULT_COUNTRY: CountryCode = "US";
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [preferredCountry, setPreferredCountryState] =
@@ -48,7 +48,35 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     const stored = localStorage.getItem(STORAGE_KEY) as CountryCode | null;
     if (stored && COUNTRY_CODES.includes(stored)) {
       setPreferredCountryState(stored);
+      return;
     }
+
+    // Auto-detect country from IP if no stored preference
+    fetch("https://ipapi.co/json/")
+      .then((res) => res.json())
+      .then((data) => {
+        const countryCode = data.country_code as string;
+        // Map common country codes to our supported ones
+        const countryMap: Record<string, CountryCode> = {
+          US: "US",
+          GB: "UK",
+          IN: "IN",
+          AE: "AE",
+          CN: "CN",
+          KR: "KR",
+          JP: "JP",
+          DE: "DE",
+          AU: "AU",
+          HK: "HK",
+        };
+        const detected = countryMap[countryCode];
+        if (detected) {
+          setPreferredCountryState(detected);
+        }
+      })
+      .catch(() => {
+        // Silently fall back to DEFAULT_COUNTRY if detection fails
+      });
   }, []);
 
   const setPreferredCountry = useCallback((c: CountryCode) => {
