@@ -70,7 +70,16 @@ export function SignInModal({ isOpen, onClose, onUserChange }: SignInModalProps)
     setMessage(null);
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({ email });
+      const redirectUrl = typeof window !== 'undefined' 
+        ? `${window.location.origin}/api/auth/callback` 
+        : undefined;
+      
+      const { error } = await supabase.auth.signInWithOtp({ 
+        email,
+        options: {
+          emailRedirectTo: redirectUrl,
+        }
+      });
       if (error) throw error;
       setMessage("Check your email! Click the link to sign in.");
       setEmail("");
