@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LightBulbIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import type { WishlistItem } from "@/types";
@@ -57,8 +58,9 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
       {error && (
         <p className="text-sm text-red-400">{error}</p>
       )}
-      <p className="text-xs text-zinc-500">
-        💬 Tip: Sign in to keep your list forever. Your future self will thank you!
+      <p className="text-xs text-zinc-500 flex items-start gap-2">
+        <LightBulbIcon className="h-3.5 w-3.5 mt-0.5 flex-shrink-0 text-zinc-600" />
+        <span>Sign in to keep your list forever. Your future self will thank you!</span>
       </p>
     </form>
   );

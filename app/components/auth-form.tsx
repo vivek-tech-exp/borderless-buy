@@ -39,7 +39,7 @@ export function AuthForm({ onUserChange }: { onUserChange?: (user: any) => void 
     try {
       const { error } = await supabase.auth.signInWithOtp({ email });
       if (error) throw error;
-      setMessage("✨ Check your email! Click the link to get in.");
+      setMessage("Check your email! Click the link to sign in.");
       setEmail("");
     } catch (err: any) {
       setMessage(err?.message ?? String(err));

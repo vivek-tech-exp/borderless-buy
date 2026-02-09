@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { GlobeAltIcon, ChartPieIcon, CurrencyDollarIcon, BellAlertIcon } from "@heroicons/react/24/outline";
 import { AddItemForm } from "@/app/components/add-item-form";
 import { WishlistCard } from "@/app/components/wishlist-card";
 import { AnalyticsPie } from "@/app/components/analytics-pie";
@@ -148,7 +149,7 @@ export default function MainDashboard() {
                 Borderless Buy
               </h1>
               <p className="mt-2 text-sm text-zinc-400">
-                Find the best deals worldwide 🌍 See what things cost in different countries & save big.
+                Find the best deals worldwide. See what things cost in different countries and save big.
               </p>
             </div>
             <button
@@ -183,9 +184,10 @@ export default function MainDashboard() {
       </header>
 
       {items.length > 0 && !user && (
-        <section className="mb-12 rounded-lg border border-amber-900 bg-amber-950/50 p-4">
+        <section className="mb-12 rounded-lg border border-amber-900 bg-amber-950/50 p-4 flex items-start gap-3">
+          <BellAlertIcon className="h-5 w-5 mt-0.5 text-amber-600 flex-shrink-0" />
           <p className="text-sm text-amber-100">
-            <span className="font-medium">⏰ Heads up!</span> Your wishlist will vanish if you refresh. Sign in to lock it in forever—it's free!
+            <span className="font-medium">Your wishlist is temporary.</span> Sign in to lock it in forever—it's free!
           </p>
         </section>
       )}
@@ -196,7 +198,12 @@ export default function MainDashboard() {
 
       <section className="mb-12">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-medium text-zinc-400">✨ Your Wishlist</h2>
+          <h2 className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+            <svg className="h-4 w-4 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.381-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+            </svg>
+            Your Wishlist
+          </h2>
           {items.length > 0 && (
             <div className="flex items-center gap-1">
               <button
@@ -264,8 +271,9 @@ export default function MainDashboard() {
       </section>
 
       <section className="mb-12">
-        <h2 className="mb-6 text-sm font-medium text-zinc-400">
-          📊 See prices across the world
+        <h2 className="mb-6 text-sm font-medium text-zinc-400 flex items-center gap-2">
+          <ChartPieIcon className="h-4 w-4 text-emerald-600" />
+          See prices across the world
         </h2>
         <AnalyticsPie items={chartItems} hoveredItemId={hoveredItemId} />
       </section>
@@ -273,8 +281,9 @@ export default function MainDashboard() {
       {showTotals && (
         <section className="mb-12">
           <div className="mb-6 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-medium text-zinc-400">
-              💰 How much you'd spend in each country
+            <h2 className="text-sm font-medium text-zinc-400 flex items-center gap-2">
+              <CurrencyDollarIcon className="h-4 w-4 text-emerald-600" />
+              How much you&apos;d spend in each country
             </h2>
             <button
               type="button"
