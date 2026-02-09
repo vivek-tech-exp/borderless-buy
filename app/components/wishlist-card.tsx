@@ -9,6 +9,8 @@ import { formatCurrency } from "@/app/lib/utils";
 import { Card, CardContent, CardHeader } from "@/app/components/ui/card";
 import { ITEM_CHART_COLORS } from "@/app/lib/constants";
 
+export type ViewMode = "local" | "global";
+
 interface WishlistCardProps {
   item: WishlistItem;
   selected: boolean;
@@ -17,6 +19,7 @@ interface WishlistCardProps {
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
   isHovered?: boolean;
+  viewMode?: ViewMode;
 }
 
 export function WishlistCard({
@@ -27,9 +30,10 @@ export function WishlistCard({
   onMouseEnter,
   onMouseLeave,
   isHovered,
+  viewMode = "global",
 }: WishlistCardProps) {
   const [showDetails, setShowDetails] = useState(false);
-  const { convertToPreferred, preferredCurrency, rates } = useCurrency();
+  const { convertToPreferred, preferredCurrency, preferredCountry, rates } = useCurrency();
   const { product } = item;
 
   const pricesByCountry = COUNTRY_CODES.map((code) => {
@@ -72,6 +76,10 @@ export function WishlistCard({
   const best = withConverted.length
     ? withConverted.reduce((a, b) => (a.convertedPrice <= b.convertedPrice ? a : b))
     : null;
+
+  // Get home country price for local mode
+  const homeCountryData = pricesByCountry.find(r => r.code === preferredCountry);
+  const hasHomePrice = homeCountryData?.convertedValid && homeCountryData.convertedPrice != null;
 
   return (
     <Card
@@ -120,25 +128,71 @@ export function WishlistCard({
       </CardHeader>
 
       <CardContent className="pt-0">
-        {/* Best Price Highlight */}
-        {best && (
-          <div className="mb-5 p-4 rounded-xl border" style={{backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--accent-primary)', opacity: 0.8}}>
-            <p className="text-xs uppercase tracking-wide font-medium mb-1" style={{color: 'var(--text-secondary)'}}>
-              💰 Best Available Price
-            </p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold" style={{color: 'var(--accent-primary)'}}>
-                {formatCurrency(best.convertedPrice, preferredCurrency, { maxFractionDigits: 0 })}
-              </span>
-              <span className="text-sm" style={{color: 'var(--text-secondary)'}}>
-                in {best.label}
-              </span>
+        {viewMode === "local" ? (
+          /* Local Mode View */
+          <>
+            {/* Home Country Price - Prominent */}
+            <div className="mb-4 p-5 rounded-xl border" style={{backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)'}}>
+              <p className="text-xs uppercase tracking-wide font-medium mb-2" style={{color: 'var(--text-secondary)'}}>
+                🏠 {COUNTRY_LABELS[preferredCountry]} Price
+              </p>
+              {hasHomePrice ? (
+                <>
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <span className="text-3xl font-bold" style={{color: 'var(--text-primary)'}}>
+                      {formatCurrency(homeCountryData!.convertedPrice!, preferredCurrency, { maxFractionDigits: 0 })}
+                    </span>
+                  </div>
+                  {homeCountryData!.buyingLink && (
+                    <a
+                      href={homeCountryData!.buyingLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block text-sm font-medium transition-colors mt-2"
+                      style={{color: 'var(--accent-primary)'}}
+                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+                    >
+                      Buy now →
+                    </a>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm" style={{color: 'var(--text-tertiary)'}}>
+                  Not available in {COUNTRY_LABELS[preferredCountry]}
+                </p>
+              )}
             </div>
-          </div>
-        )}
 
-        {/* Country Grid */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
+            {/* Hint to switch to global view */}
+            {best && homeCountryData?.code !== best.code && (
+              <div className="px-3 py-2 rounded-lg text-xs" style={{backgroundColor: 'var(--bg-secondary)', color: 'var(--text-tertiary)'}}>
+                💡 Switch to Global View to see cheaper options in other countries
+              </div>
+            )}
+          </>
+        ) : (
+          /* Global Mode View */
+          <>
+            {/* Best Price Highlight */}
+            {best && (
+              <div className="mb-5 p-4 rounded-xl border" style={{backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--accent-primary)', opacity: 0.8}}>
+                <p className="text-xs uppercase tracking-wide font-medium mb-1" style={{color: 'var(--text-secondary)'}}>
+                  💰 Best Available Price
+                </p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-bold" style={{color: 'var(--accent-primary)'}}>
+                    {formatCurrency(best.convertedPrice, preferredCurrency, { maxFractionDigits: 0 })}
+                  </span>
+                  <span className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                    in {best.label}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Country Grid */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
           {pricesByCountry.map((row) => {
             const isBest = best?.code === row.code;
             const color = ITEM_CHART_COLORS[row.code];
@@ -272,6 +326,8 @@ export function WishlistCard({
               );
             })}
           </div>
+        )}
+          </>
         )}
       </CardContent>
     </Card>

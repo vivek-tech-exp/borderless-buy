@@ -8,6 +8,7 @@ import { AnalyticsPie } from "@/app/components/analytics-pie";
 import { CountryFlagSelector } from "@/app/components/country-flag-selector";
 import { PromptInfoModal } from "@/app/components/prompt-info-modal";
 import { ThemeSwitcher } from "@/app/components/theme-switcher";
+import { ViewModeToggle, type ViewMode } from "@/app/components/view-mode-toggle";
 import { useCurrency } from "@/app/lib/currency-context";
 import { supabase } from "@/app/lib/supabase";
 import { SignInModal } from "@/app/components/sign-in-modal";
@@ -25,8 +26,9 @@ export default function MainDashboard() {
   const [showSignInModal, setShowSignInModal] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [totalsExpanded, setTotalsExpanded] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>("global");
 
-  const { convertToPreferred, preferredCurrency } = useCurrency();
+  const { convertToPreferred, preferredCurrency, preferredCountry } = useCurrency();
 
   // Load persisted items for signed-in users
   useEffect(() => {
@@ -65,6 +67,19 @@ export default function MainDashboard() {
     setDefault();
     mediaQuery.addEventListener("change", setDefault);
     return () => mediaQuery.removeEventListener("change", setDefault);
+  }, []);
+
+  // Load and persist view mode preference
+  useEffect(() => {
+    const stored = localStorage.getItem("borderless-buy-view-mode") as ViewMode | null;
+    if (stored && (stored === "local" || stored === "global")) {
+      setViewMode(stored);
+    }
+  }, []);
+
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem("borderless-buy-view-mode", mode);
   }, []);
 
   const handleAdd = useCallback(async (item: WishlistItem, prompt?: string) => {
@@ -243,6 +258,16 @@ export default function MainDashboard() {
         <AddItemForm onAdd={handleAdd} />
       </section>
 
+      {items.length > 0 && (
+        <section className="mb-8">
+          <ViewModeToggle 
+            mode={viewMode} 
+            onToggle={handleViewModeChange}
+            countryLabel={COUNTRY_LABELS[preferredCountry]}
+          />
+        </section>
+      )}
+
       <section className="mb-12">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
@@ -317,6 +342,7 @@ export default function MainDashboard() {
                   onMouseEnter={() => setHoveredItemId(item.id)}
                   onMouseLeave={() => setHoveredItemId(null)}
                   isHovered={hoveredItemId === item.id}
+                  viewMode={viewMode}
                 />
               </li>
             ))}
@@ -342,7 +368,7 @@ export default function MainDashboard() {
             <button
               type="button"
               onClick={() => setTotalsExpanded((prev) => !prev)}
-              className="rounded-md px-2.5 py-1 text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300 sm:hidden"
+              className="rounded-md px-2.5 py-1 text-xs text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-secondary)] sm:hidden"
               aria-expanded={totalsExpanded}
               aria-controls="totals-panel"
             >
@@ -351,39 +377,62 @@ export default function MainDashboard() {
           </div>
           <div
             id="totals-panel"
-            className={`${totalsExpanded ? "block" : "hidden"} sm:block`}
+            className={`${totalsExpanded ? "block" : "hidden"} sm:block transition-all duration-200`}
           >
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-              {totalsByCountry.map(({ code, label, total }) => (
-                <div
-                  key={code}
-                  className="rounded-xl border border-zinc-700/80 bg-zinc-900/80 px-3 py-3 min-h-[100px] flex flex-col justify-between"
-                >
-                  <div className="min-w-0">
-                    <span
-                      className="mb-1 block h-1.5 w-1.5 rounded-full"
-                      style={{ backgroundColor: ITEM_CHART_COLORS[code] }}
-                      aria-hidden
-                    />
-                    <p className="text-[10px] font-medium uppercase tracking-wider text-zinc-500 truncate">
-                      {label}
-                    </p>
-                  </div>
-                  <p className="mt-2 text-base font-semibold tabular-nums text-zinc-100 break-words">
-                    {total > 0
-                      ? formatCurrency(total, preferredCurrency)
-                      : "—"}
+            {viewMode === "local" ? (
+              /* Local Mode - Show only home country total */
+              <>
+                <div className="rounded-2xl border p-6 max-w-md" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+                  <p className="text-xs uppercase tracking-wide font-medium mb-3" style={{color: 'var(--text-secondary)'}}>
+                    Total in {COUNTRY_LABELS[preferredCountry]}
+                  </p>
+                  <p className="text-4xl font-bold" style={{color: 'var(--accent-primary)'}}>
+                    {totalsByCountry.find(t => t.code === preferredCountry)?.total ?? 0 > 0
+                      ? formatCurrency(totalsByCountry.find(t => t.code === preferredCountry)!.total, preferredCurrency)
+                      : formatCurrency(0, preferredCurrency)}
+                  </p>
+                  <p className="text-xs mt-2" style={{color: 'var(--text-tertiary)'}}>
+                    Cost for {selectedItems.length} {selectedItems.length === 1 ? 'item' : 'items'}
                   </p>
                 </div>
-              ))}
-            </div>
-            {bestTotal > 0 && (
-              <p className="mt-4 text-sm text-[var(--text-secondary)]">
-                💰 Cost to Satisfy:{" "}
-                <span className="font-medium" style={{color: 'var(--accent-primary)'}}>
-                  {formatCurrency(bestTotal, preferredCurrency)}
-                </span>
-              </p>
+              </>
+            ) : (
+              /* Global Mode - Show all countries */
+              <>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                  {totalsByCountry.map(({ code, label, total }) => (
+                    <div
+                      key={code}
+                      className="rounded-xl border px-3 py-3 min-h-[100px] flex flex-col justify-between"
+                      style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}
+                    >
+                      <div className="min-w-0">
+                        <span
+                          className="mb-1 block h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: ITEM_CHART_COLORS[code] }}
+                          aria-hidden
+                        />
+                        <p className="text-[10px] font-medium uppercase tracking-wider truncate" style={{color: 'var(--text-tertiary)'}}>
+                          {label}
+                        </p>
+                      </div>
+                      <p className="mt-2 text-base font-semibold tabular-nums break-words" style={{color: 'var(--text-primary)'}}>
+                        {total > 0
+                          ? formatCurrency(total, preferredCurrency)
+                          : "—"}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                {bestTotal > 0 && (
+                  <p className="mt-4 text-sm text-[var(--text-secondary)]">
+                    💰 Cost to Satisfy:{" "}
+                    <span className="font-medium" style={{color: 'var(--accent-primary)'}}>
+                      {formatCurrency(bestTotal, preferredCurrency)}
+                    </span>
+                  </p>
+                )}
+              </>
             )}
           </div>
         </section>
