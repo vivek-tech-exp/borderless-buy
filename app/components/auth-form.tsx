@@ -33,13 +33,13 @@ export function AuthForm({ onUserChange }: { onUserChange?: (user: any) => void 
   }, [onUserChange]);
 
   async function signIn() {
-    if (!email) return setMessage("Enter an email address");
+    if (!email) return setMessage("Oops! Please enter your email.");
     setMessage(null);
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({ email });
       if (error) throw error;
-      setMessage("Check your inbox for a magic link to sign in.");
+      setMessage("✨ Check your email! Click the link to get in.");
       setEmail("");
     } catch (err: any) {
       setMessage(err?.message ?? String(err));
@@ -56,13 +56,13 @@ export function AuthForm({ onUserChange }: { onUserChange?: (user: any) => void 
   if (user) {
     return (
       <div className="flex items-center gap-2">
-        <div className="text-xs text-zinc-400">Signed in</div>
+        <div className="text-xs text-zinc-400">👋 Hey,</div>
         <div className="text-sm font-medium text-zinc-100 truncate">{user.email ?? user.phone ?? user.id}</div>
         <button
           onClick={signOut}
           className="ml-2 rounded-md bg-zinc-800 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-700"
         >
-          Sign out
+          Exit
         </button>
       </div>
     );
@@ -74,7 +74,7 @@ export function AuthForm({ onUserChange }: { onUserChange?: (user: any) => void 
         type="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        placeholder="Email for magic link"
+        placeholder="Your email"
         className="rounded-md bg-zinc-900 border border-zinc-700 px-2 py-1 text-sm text-zinc-100"
       />
       <button

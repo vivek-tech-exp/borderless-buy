@@ -138,7 +138,7 @@ export default function MainDashboard() {
                 Borderless Buy
               </h1>
               <p className="mt-1.5 text-sm text-zinc-500">
-                Your wishlist — plan purchases, track totals, and find where to save by buying globally.
+                Find the best deals worldwide 🌍 See what things cost in different countries & save big.
               </p>
             </div>
             <button
@@ -175,8 +175,7 @@ export default function MainDashboard() {
       {items.length > 0 && !user && (
         <section className="mb-6 rounded-lg border border-amber-900 bg-amber-950/50 p-4">
           <p className="text-sm text-amber-100">
-            <span className="font-medium">💡 Tip:</span> Your items are currently saved in browser memory only. 
-            Sign in with your email to persist them permanently!
+            <span className="font-medium">⏰ Heads up!</span> Your wishlist will vanish if you refresh. Sign in to lock it in forever—it's free!
           </p>
         </section>
       )}
@@ -188,7 +187,7 @@ export default function MainDashboard() {
       {showTotals && (
         <section className="mb-8">
           <h2 className="mb-4 text-sm font-medium text-zinc-400">
-            Your investment by country
+            💰 How much you'd spend in each country
           </h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {totalsByCountry.map(({ code, label, total }) => (
@@ -216,7 +215,7 @@ export default function MainDashboard() {
           </div>
           {bestTotal > 0 && (
             <p className="mt-4 text-sm text-zinc-400">
-              💰 Cheapest option:{" "}
+              🏆 Sweetest deal:{" "}
               <span className="font-medium text-emerald-400">
                 {formatCurrency(bestTotal, preferredCurrency)}
               </span>
@@ -227,14 +226,14 @@ export default function MainDashboard() {
 
       <section className="mb-8">
         <h2 className="mb-4 text-sm font-medium text-zinc-400">
-          Cost breakdown by country
+          📊 See prices across the world
         </h2>
         <AnalyticsPie items={chartItems} hoveredItemId={hoveredItemId} />
       </section>
 
       <section>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-medium text-zinc-400">Wishlist</h2>
+          <h2 className="text-sm font-medium text-zinc-400">✨ Your Wishlist</h2>
           {items.length > 0 && (
             <div className="flex items-center gap-1">
               <button
@@ -242,7 +241,7 @@ export default function MainDashboard() {
                 onClick={selectAll}
                 className="rounded-md px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
               >
-                Select all
+                Pick all
               </button>
               <span className="text-zinc-600" aria-hidden>·</span>
               <button
@@ -250,14 +249,14 @@ export default function MainDashboard() {
                 onClick={deselectAll}
                 className="rounded-md px-3 py-1.5 text-xs text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
               >
-                Deselect all
+                Clear all
               </button>
             </div>
           )}
         </div>
         {items.length === 0 ? (
           <p className="rounded-xl border border-dashed border-zinc-700 py-10 text-center text-sm text-zinc-500">
-            Start building your wishlist! Add items you want to buy (e.g., MacBook, iPhone 16, or a motorcycle) to see total costs and find the best deals globally.
+            Dream big! 🚀 Add something you want (like a MacBook, headphones, or even a bike) and we'll show you the best prices around the world.
           </p>
         ) : (
           <ul className="grid gap-4 lg:grid-cols-2">

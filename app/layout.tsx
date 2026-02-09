@@ -5,7 +5,7 @@ import { CurrencyProvider } from "@/app/lib/currency-context";
 export const metadata: Metadata = {
   title: "Borderless Buy — Compare prices across 6 countries",
   description:
-    "Compare product prices across India, Nepal, USA, UAE Dubai, China & South Korea. Pick your currency and see where to buy.",
+    "Find the best deals worldwide. Compare prices across countries and save money on your dream purchases. Add items to your wishlist instantly.",
 };
 
 export default function RootLayout({

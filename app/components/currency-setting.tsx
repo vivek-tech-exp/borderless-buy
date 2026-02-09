@@ -13,7 +13,7 @@ export function CurrencySetting() {
         htmlFor="currency-select"
         className="hidden sm:block text-xs font-medium text-zinc-500"
       >
-        View prices in
+        Show prices in
       </label>
 
       <div className="flex items-center gap-3">
@@ -33,14 +33,14 @@ export function CurrencySetting() {
         </select>
 
         <div className="hidden sm:block">
-          <p className="text-[10px] text-zinc-600">Currency: <span className="font-medium">{COUNTRY_CURRENCY[preferredCountry]}</span></p>
+          <p className="text-[10px] text-zinc-600">💵 <span className="font-medium">{COUNTRY_CURRENCY[preferredCountry]}</span></p>
           {rates.updatedAt && (
             <p className="text-[10px] text-zinc-600">
-              Rates updated {new Date(rates.updatedAt).toLocaleDateString()}
+              ✓ Updated today
             </p>
           )}
           {rates.error && (
-            <p className="text-[10px] text-amber-500">Rates unavailable</p>
+            <p className="text-[10px] text-amber-500">Rates being updated…</p>
           )}
         </div>
       </div>
