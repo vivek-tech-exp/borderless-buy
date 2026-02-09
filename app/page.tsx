@@ -217,6 +217,15 @@ export default function MainDashboard() {
     input?.focus();
   }, []);
 
+  // Validate and sanitize income input
+  const handleIncomeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    // Allow empty or valid positive numbers up to 99,999,999
+    if (val === "" || (/^\d+(\.\d{0,2})?$/.test(val) && Number(val) <= 99999999)) {
+      setIncomeInput(val);
+    }
+  }, []);
+
   useEffect(() => {
     if (user) return;
     try {
@@ -239,6 +248,22 @@ export default function MainDashboard() {
       // If storage fails, silently skip.
     }
   }, [incomeInput, user]);
+
+  // Sync income across tabs in real-time
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "borderless-buy-income") {
+        // Income changed in another tab
+        if (e.newValue) {
+          setIncomeInput(e.newValue);
+        } else {
+          setIncomeInput("");
+        }
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
 
   const selectedItems = items.filter((i) => selectedIds.has(i.id));
   const chartItems =
@@ -385,16 +410,25 @@ export default function MainDashboard() {
                   type="number"
                   inputMode="decimal"
                   min="0"
+                  max="99999999"
                   placeholder="0"
                   value={incomeInput}
-                  onChange={(e) => setIncomeInput(e.target.value)}
+                  onChange={handleIncomeChange}
                   className="h-10 w-40 px-3 text-sm"
                   aria-label="Monthly income"
                 />
               </label>
             </div>
             <span className="text-[11px]" style={{color: 'var(--text-tertiary)'}}>
-              Your number stays yours: on-device only. Not stored, not shared, not even visible to us.
+              🔒 Your income stays private: stored locally on this device only. Not sent to servers. Not visible to anyone.{" "}
+              <a 
+                href="/docs/SECURITY_AUDIT.md" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="underline hover:opacity-75 transition-opacity"
+              >
+                Learn more
+              </a>
             </span>
           </div>
         </section>
