@@ -20,6 +20,8 @@ interface WishlistCardProps {
   onMouseLeave?: () => void;
   isHovered?: boolean;
   viewMode?: ViewMode;
+  incomeAmount?: number;
+  onIncomeFocus?: () => void;
 }
 
 export function WishlistCard({
@@ -31,6 +33,8 @@ export function WishlistCard({
   onMouseLeave,
   isHovered,
   viewMode = "global",
+  incomeAmount,
+  onIncomeFocus,
 }: WishlistCardProps) {
   const [showDetails, setShowDetails] = useState(false);
   const { convertToPreferred, preferredCurrency, preferredCountry, rates } = useCurrency();
@@ -80,6 +84,16 @@ export function WishlistCard({
   // Get home country price for local mode
   const homeCountryData = pricesByCountry.find(r => r.code === preferredCountry);
   const hasHomePrice = homeCountryData?.convertedValid && homeCountryData.convertedPrice != null;
+
+  const effectivePrice = viewMode === "local"
+    ? (hasHomePrice ? homeCountryData!.convertedPrice! : null)
+    : (best ? best.convertedPrice : null);
+  const incomeRatio = incomeAmount && incomeAmount > 0 && effectivePrice
+    ? effectivePrice / incomeAmount
+    : null;
+  const incomeRatioLabel = incomeRatio
+    ? `${incomeRatio.toFixed(1)}x your monthly income`
+    : null;
 
   return (
     <Card
@@ -143,6 +157,23 @@ export function WishlistCard({
                       {formatCurrency(homeCountryData!.convertedPrice!, preferredCurrency, { maxFractionDigits: 0 })}
                     </span>
                   </div>
+                  {incomeRatioLabel ? (
+                    <div className="flex items-center gap-1.5 text-xs" style={{color: 'var(--text-tertiary)'}}>
+                      <ClockIcon className="h-3.5 w-3.5" />
+                      <span>About {incomeRatioLabel}</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="text-xs transition-colors"
+                      style={{color: 'var(--accent-primary)'}}
+                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+                      onClick={onIncomeFocus}
+                    >
+                      Add income to see affordability
+                    </button>
+                  )}
                   {homeCountryData!.buyingLink && (
                     <a
                       href={homeCountryData!.buyingLink}
@@ -188,6 +219,23 @@ export function WishlistCard({
                     in {best.label}
                   </span>
                 </div>
+                {incomeRatioLabel ? (
+                  <div className="flex items-center gap-1.5 text-xs mt-2" style={{color: 'var(--text-tertiary)'}}>
+                    <ClockIcon className="h-3.5 w-3.5" />
+                    <span>About {incomeRatioLabel}</span>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="text-xs mt-2 transition-colors"
+                    style={{color: 'var(--accent-primary)'}}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+                    onClick={onIncomeFocus}
+                  >
+                    Add income to see affordability
+                  </button>
+                )}
               </div>
             )}
 

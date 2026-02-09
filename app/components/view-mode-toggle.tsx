@@ -51,7 +51,9 @@ export function ViewModeToggle({ mode, onToggle, countryLabel }: ViewModeToggleP
           </>
         )}
         <span className="text-xs opacity-70">•</span>
-        <span className="text-xs opacity-70">Click to switch</span>
+        <span className="text-xs opacity-70">
+          {isGlobal ? `Tap for ${countryLabel} view` : "Tap for Global view"}
+        </span>
       </button>
     </div>
   );

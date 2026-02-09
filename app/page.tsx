@@ -9,6 +9,7 @@ import { CountryFlagSelector } from "@/app/components/country-flag-selector";
 import { PromptInfoModal } from "@/app/components/prompt-info-modal";
 import { ThemeSwitcher } from "@/app/components/theme-switcher";
 import { ViewModeToggle, type ViewMode } from "@/app/components/view-mode-toggle";
+import { Input } from "@/app/components/ui/input";
 import { useCurrency } from "@/app/lib/currency-context";
 import { supabase } from "@/app/lib/supabase";
 import { SignInModal } from "@/app/components/sign-in-modal";
@@ -16,6 +17,8 @@ import { COUNTRY_CODES, COUNTRY_LABELS } from "@/types";
 import { ITEM_CHART_COLORS } from "@/app/lib/constants";
 import { formatCurrency } from "@/app/lib/utils";
 import type { WishlistItem } from "@/types";
+
+const LOCAL_WISHLIST_KEY = "borderless-buy-guest-wishlist";
 
 export default function MainDashboard() {
   const [items, setItems] = useState<WishlistItem[]>([]);
@@ -27,10 +30,29 @@ export default function MainDashboard() {
   const [user, setUser] = useState<any>(null);
   const [totalsExpanded, setTotalsExpanded] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("global");
+  const [incomeInput, setIncomeInput] = useState<string>("");
 
   const { convertToPreferred, preferredCurrency, preferredCountry } = useCurrency();
 
-  // Load persisted items for signed-in users
+  // Load guest items from localStorage on first mount
+  useEffect(() => {
+    const stored = localStorage.getItem(LOCAL_WISHLIST_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as WishlistItem[];
+        setItems(parsed);
+      } catch {
+        localStorage.removeItem(LOCAL_WISHLIST_KEY);
+      }
+    }
+    // Also restore income preference
+    const savedIncome = localStorage.getItem("borderless-buy-income");
+    if (savedIncome) {
+      setIncomeInput(savedIncome);
+    }
+  }, []);
+
+  // Load persisted items for signed-in users; sync with auth state
   useEffect(() => {
     let mounted = true;
     async function load() {
@@ -47,15 +69,63 @@ export default function MainDashboard() {
         if (!res.ok) throw new Error(data.error ?? "Failed to load wishlist");
         if (mounted && data.items) {
           setItems(data.items);
+          // Clear guest localStorage after successful sync
+          localStorage.removeItem(LOCAL_WISHLIST_KEY);
+          localStorage.removeItem("borderless-buy-income");
         }
       } catch (err: any) {
         console.warn("Failed to load wishlist:", err?.message ?? String(err));
       }
     }
+
+    async function migrateGuestDataToServer() {
+      // Check if guest has local items and user just signed in
+      const stored = localStorage.getItem(LOCAL_WISHLIST_KEY);
+      if (!stored) return;
+
+      try {
+        const guestItems = JSON.parse(stored) as WishlistItem[];
+        if (guestItems.length === 0) return;
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        if (!token) return;
+
+        // Upload each guest item to server
+        for (const item of guestItems) {
+          await fetch("/api/wishlist", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ item }),
+          });
+        }
+        console.log(`Migrated ${guestItems.length} guest items to server`);
+      } catch (err) {
+        console.warn("Failed to migrate guest data:", err);
+      }
+    }
+
     load();
     const { data: sub } = supabase.auth.onAuthStateChange((_, session) => {
-      if (session?.user) load();
-      if (!session?.user) setItems([]);
+      if (session?.user) {
+        // User signed in: migrate guest data first, then load from server
+        migrateGuestDataToServer().then(() => load());
+      } else {
+        // User signed out: try to load guest data from localStorage
+        const stored = localStorage.getItem(LOCAL_WISHLIST_KEY);
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored) as WishlistItem[];
+            setItems(parsed);
+          } catch {
+            setItems([]);
+          }
+        } else {
+          setItems([]);
+        }
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -135,6 +205,37 @@ export default function MainDashboard() {
   const deselectAll = useCallback(() => {
     setSelectedIds(new Set());
   }, []);
+
+  const incomeAmount = Number(incomeInput);
+  const safeIncomeAmount = Number.isFinite(incomeAmount) ? incomeAmount : 0;
+
+  const handleIncomeFocus = useCallback(() => {
+    const input = document.getElementById("income-input") as HTMLInputElement | null;
+    input?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (user) return;
+    try {
+      localStorage.setItem(LOCAL_WISHLIST_KEY, JSON.stringify(items));
+    } catch {
+      // If storage fails (quota or private mode), silently skip.
+    }
+  }, [items, user]);
+
+  // Persist income preference for guests
+  useEffect(() => {
+    if (user) return;
+    try {
+      if (incomeInput) {
+        localStorage.setItem("borderless-buy-income", incomeInput);
+      } else {
+        localStorage.removeItem("borderless-buy-income");
+      }
+    } catch {
+      // If storage fails, silently skip.
+    }
+  }, [incomeInput, user]);
 
   const selectedItems = items.filter((i) => selectedIds.has(i.id));
   const chartItems =
@@ -247,10 +348,15 @@ export default function MainDashboard() {
 
       {items.length > 0 && !user && (
         <section className="mb-12 rounded-lg border p-4 flex items-start gap-3" style={{borderColor: 'var(--status-warning-border)', backgroundColor: 'var(--status-warning-bg)'}}>
-          <BellAlertIcon className="h-5 w-5 mt-0.5 flex-shrink-0\" style={{color: 'var(--status-warning-border)'}} />
-          <p className="text-sm" style={{color: 'var(--status-warning-text)'}}>
-            <span className="font-medium">Your upgrade plan is temporary.</span> Sign in to lock it in forever—it's free!
-          </p>
+          <BellAlertIcon className="h-5 w-5 mt-0.5 flex-shrink-0" style={{color: 'var(--status-warning-border)'}} />
+          <div className="flex-1">
+            <p className="text-sm" style={{color: 'var(--status-warning-text)'}}>
+              <span className="font-medium">Your upgrade plan is temporary.</span> Sign in to lock it in forever—it's free!
+            </p>
+            <p className="text-xs mt-1.5" style={{color: 'var(--status-warning-text)', opacity: 0.8}}>
+              💾 Stored safely on this device until you sign in.
+            </p>
+          </div>
         </section>
       )}
 
@@ -259,12 +365,35 @@ export default function MainDashboard() {
       </section>
 
       {items.length > 0 && (
-        <section className="mb-8">
+        <section className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <ViewModeToggle 
             mode={viewMode} 
             onToggle={handleViewModeChange}
             countryLabel={COUNTRY_LABELS[preferredCountry]}
           />
+          <div className="flex flex-col gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs" style={{color: 'var(--text-tertiary)'}}>
+                  Monthly income ({preferredCurrency})
+                </span>
+                <Input
+                  id="income-input"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  placeholder="0"
+                  value={incomeInput}
+                  onChange={(e) => setIncomeInput(e.target.value)}
+                  className="h-10 w-40 px-3 text-sm"
+                  aria-label="Monthly income"
+                />
+              </label>
+            </div>
+            <span className="text-[11px]" style={{color: 'var(--text-tertiary)'}}>
+              Your number stays yours: on-device only. Not stored, not shared, not even visible to us.
+            </span>
+          </div>
         </section>
       )}
 
@@ -343,6 +472,8 @@ export default function MainDashboard() {
                   onMouseLeave={() => setHoveredItemId(null)}
                   isHovered={hoveredItemId === item.id}
                   viewMode={viewMode}
+                  incomeAmount={safeIncomeAmount}
+                  onIncomeFocus={handleIncomeFocus}
                 />
               </li>
             ))}
