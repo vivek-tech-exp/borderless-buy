@@ -1,4 +1,5 @@
 import type { Product } from "@/types";
+import { createLogger, type Logger } from "@/app/lib/logger";
 
 /**
  * Base interface for pricing engines.
@@ -20,6 +21,12 @@ export interface PricingEngine {
  * Abstract base class with common utilities for all pricing engines.
  */
 export abstract class BasePricingEngine implements PricingEngine {
+  protected logger: Logger;
+
+  constructor() {
+    this.logger = createLogger(this.constructor.name);
+  }
+
   abstract resolveProductPricing(query: string): Promise<{
     product: Product;
     prompt: string;
@@ -50,14 +57,15 @@ export abstract class BasePricingEngine implements PricingEngine {
   /**
    * Log with provider context for debugging.
    */
-  protected log(message: string, data?: unknown) {
-    console.log(`[${this.constructor.name}] ${message}`, data ?? "");
+  protected log(message: string, data?: Record<string, unknown>) {
+    this.logger.debug(message, data);
   }
 
-  protected error(message: string, err?: unknown) {
-    console.error(
-      `[${this.constructor.name}] ${message}`,
-      err instanceof Error ? err.message : String(err)
-    );
+  protected warn(message: string, data?: Record<string, unknown>) {
+    this.logger.warn(message, data);
+  }
+
+  protected error(message: string, err?: Error | string) {
+    this.logger.error(message, err);
   }
 }

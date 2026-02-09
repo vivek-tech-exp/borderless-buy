@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPricingEngine } from "@/app/lib/pricing-engine";
+import { createLogger } from "@/app/lib/logger";
 import type { WishlistItem } from "@/types";
+
+const logger = createLogger("AddItemRoute");
 
 /**
  * POST /api/add-item
@@ -9,10 +12,19 @@ import type { WishlistItem } from "@/types";
  * Uses the configured pricing engine (Gemini, OpenAI, Perplexity, etc.)
  */
 export async function POST(request: NextRequest) {
+  const requestId = crypto.randomUUID();
+  
   try {
     const body = await request.json();
     const query = typeof body?.query === "string" ? body.query.trim() : "";
+    
+    logger.info("Received add-item request", {
+      query,
+      requestId,
+    });
+    
     if (!query) {
+      logger.warn("Invalid request: missing query", { requestId });
       return NextResponse.json(
         { error: "Missing or invalid 'query' (e.g. 'MacBook')" },
         { status: 400 }
@@ -23,8 +35,18 @@ export async function POST(request: NextRequest) {
     const pricingEngine = getPricingEngine();
 
     // Resolve product pricing using the engine
+    logger.debug("Resolving product pricing", {
+      query,
+      requestId,
+    });
+
     const result = await pricingEngine.resolveProductPricing(query);
+    
     if (!result) {
+      logger.error("Pricing engine failed to resolve product", "No valid result returned", {
+        query,
+        requestId,
+      });
       return NextResponse.json(
         { error: "AI service failed to resolve product. Try again later." },
         { status: 503 }
@@ -39,9 +61,18 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
+    logger.info("Successfully added item", {
+      productName: product.displayName,
+      requestId,
+    });
+
     return NextResponse.json({ item, prompt });
   } catch (err) {
-    console.error("add-item API error:", err);
+    logger.error(
+      "add-item API error",
+      err instanceof Error ? err : new Error(String(err)),
+      { requestId }
+    );
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Internal server error" },
       { status: 500 }

@@ -27,11 +27,11 @@ export class GeminiPricingEngine extends BasePricingEngine {
     query: string
   ): Promise<{ product: Product; prompt: string } | null> {
     const prompt = this.buildPrompt(query);
-    this.log("Starting product resolution with query:", query);
+    this.log("Starting product resolution", { query });
 
     for (const modelName of this.models) {
       try {
-        this.log(`Trying model: ${modelName}`);
+        this.log("Attempting model", { model: modelName, query });
         const model = this.genAI.getGenerativeModel({
           model: modelName,
           generationConfig: {
@@ -43,29 +43,38 @@ export class GeminiPricingEngine extends BasePricingEngine {
         const text = genResult.response.text();
 
         if (!text) {
-          this.log(`Model ${modelName} returned empty response, trying next`);
+          this.warn(`Model returned empty response`, {
+            model: modelName,
+            query,
+          });
           continue;
         }
 
-        this.log(`Model ${modelName} succeeded`);
+        this.log("Model succeeded", { model: modelName, query });
 
         // Parse and validate response
         const parsed = JSON.parse(text) as Record<string, unknown>;
         const product = this.parseProductResponse(parsed, query);
 
         if (!product) {
-          this.log("Failed to parse product from response");
+          this.warn("Failed to parse product from response", {
+            model: modelName,
+            query,
+          });
           continue;
         }
 
         return { product, prompt };
       } catch (err) {
-        this.error(`Model ${modelName} failed`, err);
+        this.error(
+          `Model ${modelName} failed during API call or parsing`,
+          err instanceof Error ? err : new Error(String(err))
+        );
         // Continue to next model
       }
     }
 
-    this.error("All Gemini models exhausted");
+    this.error("All Gemini models exhausted", "No models succeeded");
     return null;
   }
 
@@ -180,9 +189,17 @@ Data Accuracy Over Speed: Only return prices you are confident are accurate for 
         pricing,
       };
 
+      this.log("Successfully parsed product response", {
+        productName: product.displayName,
+        query,
+      });
+
       return product;
     } catch (err) {
-      this.error("Failed to parse product response", err);
+      this.error(
+        "Failed to parse product response",
+        err instanceof Error ? err : new Error(String(err))
+      );
       return null;
     }
   }
