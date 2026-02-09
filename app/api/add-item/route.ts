@@ -6,6 +6,29 @@ import { COUNTRY_CODES } from "@/types";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? "");
 
 /**
+ * Validation: Detect placeholder/invalid prices
+ */
+function isValidPrice(price: unknown): price is number {
+  if (typeof price !== "number" || price <= 0) return false;
+  // Reject obvious placeholders: 0, 1, 123456, 999999
+  if ([0, 1, 123456, 999999].includes(price)) return false;
+  return true;
+}
+
+/**
+ * Validation: Ensure URL is a valid HTTPS link
+ */
+function isValidUrl(url: unknown): url is string {
+  if (typeof url !== "string") return false;
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" || parsed.protocol === "http:";
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Receives a product query and returns a WishlistItem with pricing for all 6 countries.
  */
 export async function POST(request: NextRequest) {
@@ -51,7 +74,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/** Resolve query to Product with pricing for IN, NP, US, AE, CN, KR. */
+/** Resolve query to Product with pricing for US, UK, IN, AE, CN, KR, JP, DE, AU, HK. */
 async function resolveProductWithGemini(
   query: string
 ): Promise<{ product: Product; prompt: string } | null> {
@@ -62,25 +85,51 @@ async function resolveProductWithGemini(
     "gemini-2.5-flash",      // Fallback
   ];
 
-  const prompt = `You are a product resolver for shoppers comparing prices across countries. Given a short query, identify the current flagship or most relevant product and return exactly this JSON (no markdown, no extra text):
+  const prompt = `You are a Precision Pricing Engine. Your goal is strict "Apples-to-Apples" comparison. You prioritize data accuracy over finding a "low" price.
+
+Task: Analyze the Query "${query}" and define a specific Baseline Configuration (e.g., "Model X, 256GB, WiFi Only"). Search for exactly this configuration in all 10 regions. If the exact configuration is not available in a region, set price to null rather than substituting a different model.
+
+Strict Filtering Rules:
+- Condition: NEW items only. Exclude "Refurbished", "Renewed", "Open Box", or "Used".  
+- Price Validation: Ignore placeholder prices (e.g., 0, 1, 123456). If the price is "Call to Order" or unavailable, set price to null.
+- Regional Sourcing:
+  * US: Amazon.com, Apple.com, Best Buy
+  * UK: Amazon.co.uk, Apple.co.uk, John Lewis
+  * IN: Amazon.in, Flipkart, Apple India
+  * AE: Noon.com, Amazon.ae, Carrefour
+  * CN: JD.com, Tmall (provide search page if login required)
+  * KR: Coupang, Samsung Korea, LG Korea
+  * JP: Amazon.co.jp, Rakuten, BIC Camera
+  * DE: Amazon.de, MediaMarkt, Currys
+  * AU: JB Hi-Fi, Harvey Norman, Amazon.au
+  * HK: Aeon.com.hk, Fortress, Watsons Electronics
+- Stock Status: Mark as "in_stock", "out_of_stock", "preorder", or "unknown".
+
+Return exactly this JSON (no markdown, no extra text):
 {
   "id": "unique-kebab-id",
   "name": "Full product name",
-  "displayName": "Short name for UI (e.g. MacBook Pro 14\\" M4)",
+  "displayName": "Short name for UI (e.g. MacBook Pro 14 M4)",
   "category": "tech" | "vehicle" | "other",
   "carryOnFriendly": true or false,
+  "baselineConfiguration": "Exact specs compared (e.g. 256GB Storage, 8GB RAM)",
   "pricing": {
-    "IN": { "price": number, "currency": "INR", "priceSource": "e.g. Apple India, Flipkart", "buyingLink": "https://..." },
-    "NP": { "price": number, "currency": "NPR", "priceSource": "e.g. Daraz Nepal", "buyingLink": "https://..." },
-    "US": { "price": number, "currency": "USD", "priceSource": "e.g. Apple US, Amazon.com", "buyingLink": "https://..." },
-    "AE": { "price": number, "currency": "AED", "priceSource": "e.g. Apple UAE, Noon", "buyingLink": "https://..." },
-    "CN": { "price": number, "currency": "CNY", "priceSource": "e.g. JD.com, Tmall", "buyingLink": "https://..." },
-    "KR": { "price": number, "currency": "KRW", "priceSource": "e.g. Samsung Korea, Coupang", "buyingLink": "https://..." }
+    "US": { "price": number or null, "currency": "USD", "priceSource": "e.g. Apple.com", "buyingLink": "https://...", "stockStatus": "in_stock", "notes": "" },
+    "UK": { "price": number or null, "currency": "GBP", "priceSource": "e.g. Apple.co.uk", "buyingLink": "https://...", "stockStatus": "in_stock", "notes": "" },
+    "IN": { "price": number or null, "currency": "INR", "priceSource": "e.g. Apple India", "buyingLink": "https://...", "stockStatus": "in_stock", "notes": "" },
+    "AE": { "price": number or null, "currency": "AED", "priceSource": "e.g. Noon.com", "buyingLink": "https://...", "stockStatus": "in_stock", "notes": "" },
+    "CN": { "price": number or null, "currency": "CNY", "priceSource": "e.g. JD.com", "buyingLink": "https://...", "stockStatus": "in_stock", "notes": "" },
+    "KR": { "price": number or null, "currency": "KRW", "priceSource": "e.g. Coupang", "buyingLink": "https://...", "stockStatus": "in_stock", "notes": "" },
+    "JP": { "price": number or null, "currency": "JPY", "priceSource": "e.g. Amazon.co.jp", "buyingLink": "https://...", "stockStatus": "in_stock", "notes": "" },
+    "DE": { "price": number or null, "currency": "EUR", "priceSource": "e.g. Amazon.de", "buyingLink": "https://...", "stockStatus": "in_stock", "notes": "" },
+    "AU": { "price": number or null, "currency": "AUD", "priceSource": "e.g. JB Hi-Fi", "buyingLink": "https://...", "stockStatus": "in_stock", "notes": "" },
+    "HK": { "price": number or null, "currency": "HKD", "priceSource": "e.g. Fortress", "buyingLink": "https://...", "stockStatus": "in_stock", "notes": "" }
   }
 }
-Rules: Provide real or plausible prices in local currency for each country (IN=India, NP=Nepal, US=USA, AE=UAE Dubai, CN=China, KR=South Korea). Use real current flagship models. Fill all 6 keys in pricing. Use official or major retailer URLs. Query: "${query}"`;
 
-  console.log("[Gemini prompt]", prompt);
+Data Accuracy Over Speed: Only return prices you are confident are accurate for the EXACT configuration. Use null for unavailable or uncertain prices. Be conservative.`;
+
+  console.log("[Gemini Precision Pricing Prompt]", prompt);
 
   for (const modelName of models) {
     try {
@@ -110,19 +159,23 @@ Rules: Provide real or plausible prices in local currency for each country (IN=I
       if (pricingRaw && typeof pricingRaw === "object") {
         for (const code of COUNTRY_CODES) {
           const p = pricingRaw[code] as Record<string, unknown> | undefined;
-          if (
-            p &&
-            typeof p.price === "number" &&
-            typeof p.currency === "string" &&
-            typeof p.priceSource === "string" &&
-            typeof p.buyingLink === "string"
-          ) {
-            pricing[code] = {
-              price: Number(p.price),
-              currency: String(p.currency),
-              priceSource: String(p.priceSource),
-              buyingLink: String(p.buyingLink),
-            };
+          if (p && typeof p === "object") {
+            const price = isValidPrice(p.price) ? p.price : null;
+            const buyingLink = isValidUrl(p.buyingLink) ? String(p.buyingLink) : "";
+            
+            // Only include pricing entry if we have critical data or if price is null (unavailable)
+            if (typeof p.currency === "string" && typeof p.priceSource === "string") {
+              pricing[code] = {
+                price,
+                currency: String(p.currency),
+                priceSource: String(p.priceSource),
+                buyingLink,
+                stockStatus: ["in_stock", "out_of_stock", "preorder", "unknown"].includes(String(p.stockStatus))
+                  ? (p.stockStatus as "in_stock" | "out_of_stock" | "preorder" | "unknown")
+                  : "unknown",
+                notes: typeof p.notes === "string" ? p.notes : "",
+              };
+            }
           }
         }
       }
@@ -135,6 +188,7 @@ Rules: Provide real or plausible prices in local currency for each country (IN=I
           ? (parsed.category as Product["category"])
           : "other",
         carryOnFriendly: Boolean(parsed.carryOnFriendly),
+        baselineConfiguration: typeof parsed.baselineConfiguration === "string" ? parsed.baselineConfiguration : undefined,
         pricing,
       };
 

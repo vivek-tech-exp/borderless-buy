@@ -43,10 +43,12 @@ export function WishlistCard({
         convertedValid: false,
         priceSource: undefined,
         buyingLink: undefined,
+        stockStatus: "unknown" as const,
+        notes: undefined as string | undefined,
       };
 
-    const converted = convertToPreferred(p.price, p.currency);
-    const convertedValid = !!rates.rates[p.currency] && !!rates.rates[preferredCurrency] && !rates.error;
+    const converted = p.price !== null ? convertToPreferred(p.price, p.currency) : null;
+    const convertedValid = p.price !== null && !!rates.rates[p.currency] && !!rates.rates[preferredCurrency] && !rates.error;
 
     return {
       code,
@@ -57,6 +59,8 @@ export function WishlistCard({
       convertedValid,
       priceSource: p.priceSource,
       buyingLink: p.buyingLink,
+      stockStatus: p.stockStatus || "unknown",
+      notes: p.notes,
     };
   });
 
@@ -156,10 +160,15 @@ export function WishlistCard({
                 }`}>
                   {hasPrice
                     ? formatCurrency(row.convertedPrice!, preferredCurrency, { maxFractionDigits: 0 })
-                    : rates.error
-                    ? "—"
-                    : "—"}
+                    : "Not available"}
                 </p>
+                {row.stockStatus && row.stockStatus !== "unknown" && (
+                  <p className="text-[10px] text-zinc-500 mt-1">
+                    {row.stockStatus === "in_stock" && "✓ In stock"}
+                    {row.stockStatus === "out_of_stock" && "✗ Out of stock"}
+                    {row.stockStatus === "preorder" && "⏳ Preorder"}
+                  </p>
+                )}
                 {row.buyingLink && hasPrice && (
                   <a
                     href={row.buyingLink}
@@ -186,7 +195,7 @@ export function WishlistCard({
 
         {/* Expanded Details */}
         {showDetails && (
-          <div className="mt-4 pt-4 border-t border-zinc-800/50 space-y-2">
+          <div className="mt-4 pt-4 border-t border-zinc-800/50 space-y-3">
             {pricesByCountry.map((row) => {
               const color = ITEM_CHART_COLORS[row.code];
               return (
@@ -200,9 +209,31 @@ export function WishlistCard({
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-zinc-300">{row.label}</p>
                       <p className="text-xs text-zinc-500 mt-0.5">
-                        Original: {row.originalPrice ? formatCurrency(row.originalPrice, row.originalCurrency!) : "—"}
+                        {row.originalPrice
+                          ? formatCurrency(row.originalPrice, row.originalCurrency!)
+                          : "Not available"}
                         {row.priceSource && ` • ${row.priceSource}`}
                       </p>
+                      {row.stockStatus && row.stockStatus !== "unknown" && (
+                        <p className="text-xs text-zinc-600 mt-1">
+                          {row.stockStatus === "in_stock" && "✓ In stock"}
+                          {row.stockStatus === "out_of_stock" && "✗ Out of stock"}
+                          {row.stockStatus === "preorder" && "⏳ Preorder"}
+                        </p>
+                      )}
+                      {row.notes && (
+                        <p className="text-xs text-amber-600 mt-1">💡 {row.notes}</p>
+                      )}
+                      {row.buyingLink && (
+                        <a
+                          href={row.buyingLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-emerald-500 hover:text-emerald-400 mt-1.5 inline-block"
+                        >
+                          View on retailer →
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>
