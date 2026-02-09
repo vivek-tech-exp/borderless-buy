@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { GlobeAltIcon, ChartPieIcon, CurrencyDollarIcon, BellAlertIcon } from "@heroicons/react/24/outline";
 import { AddItemForm } from "@/app/components/add-item-form";
 import { WishlistCard } from "@/app/components/wishlist-card";
@@ -19,8 +19,10 @@ import { formatCurrency } from "@/app/lib/utils";
 import type { WishlistItem } from "@/types";
 
 const LOCAL_WISHLIST_KEY = "borderless-buy-guest-wishlist";
+const LOCAL_INCOME_KEY = "borderless-buy-income";
 
 export default function MainDashboard() {
+  // Initialize with empty arrays to match SSR (prevents hydration errors)
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
@@ -31,27 +33,31 @@ export default function MainDashboard() {
   const [totalsExpanded, setTotalsExpanded] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>("global");
   const [incomeInput, setIncomeInput] = useState<string>("");
+  const hasLoadedFromStorage = useRef(false);
 
   const { convertToPreferred, preferredCurrency, preferredCountry } = useCurrency();
 
-  // Load guest items from localStorage on first mount
+  // Load guest data from localStorage after mount (client-only, avoids hydration errors)
   useEffect(() => {
-    const stored = localStorage.getItem(LOCAL_WISHLIST_KEY);
-    if (stored) {
-      try {
+    if (hasLoadedFromStorage.current) return;
+    
+    try {
+      const stored = localStorage.getItem(LOCAL_WISHLIST_KEY);
+      if (stored) {
         const parsed = JSON.parse(stored) as WishlistItem[];
-        console.log(`📦 Restored ${parsed.length} items from localStorage`);
         setItems(parsed);
-      } catch {
-        console.warn("⚠️ Corrupted localStorage data, clearing it");
-        localStorage.removeItem(LOCAL_WISHLIST_KEY);
       }
+    } catch (err) {
+      console.warn("Failed to load wishlist from localStorage");
+      localStorage.removeItem(LOCAL_WISHLIST_KEY);
     }
-    // Also restore income preference
-    const savedIncome = localStorage.getItem("borderless-buy-income");
+    
+    const savedIncome = localStorage.getItem(LOCAL_INCOME_KEY);
     if (savedIncome) {
       setIncomeInput(savedIncome);
     }
+    
+    hasLoadedFromStorage.current = true;
   }, []);
 
   // Load persisted items for signed-in users; sync with auth state
@@ -98,11 +104,10 @@ export default function MainDashboard() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? "Failed to load wishlist");
         if (mounted && data.items) {
-          console.log(`📥 Loaded ${data.items.length} items from server`);
           setItems(data.items);
           // Clear guest localStorage after successful sync
           localStorage.removeItem(LOCAL_WISHLIST_KEY);
-          localStorage.removeItem("borderless-buy-income");
+          localStorage.removeItem(LOCAL_INCOME_KEY);
         }
       } catch (err: any) {
         console.warn("Failed to load wishlist:", err?.message ?? String(err));
@@ -120,7 +125,7 @@ export default function MainDashboard() {
         // Even if empty, purge to mark as migrated
         if (guestItems.length === 0) {
           localStorage.removeItem(LOCAL_WISHLIST_KEY);
-          localStorage.removeItem("borderless-buy-income");
+          localStorage.removeItem(LOCAL_INCOME_KEY);
           return;
         }
 
@@ -180,27 +185,26 @@ export default function MainDashboard() {
 
         // IMMEDIATELY purge guest data after migration (success or partial)
         localStorage.removeItem(LOCAL_WISHLIST_KEY);
-        localStorage.removeItem("borderless-buy-income");
-        console.log("✓ Purged guest localStorage after migration - data is now on server");
+        localStorage.removeItem(LOCAL_INCOME_KEY);
       } catch (err) {
         console.warn("Failed to migrate guest data:", err);
       }
     }
 
     load();
-    const { data: sub } = supabase.auth.onAuthStateChange((_, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         // Update user state
         setUser(session.user);
         // User signed in: migrate guest data first, then load from server
         migrateGuestDataToServer().then(() => load());
-      } else {
-        // User signed out
+      } else if (event === 'SIGNED_OUT') {
+        // Only clear items on explicit sign-out, not initial state
         setUser(null);
-        // Start fresh (don't restore guest data)
-        // Even if guest data exists in localStorage, we don't use it
-        // Users who were migrated should see empty state until they sign back in
         setItems([]);
+      } else {
+        // Initial state or other events - just update user state
+        setUser(null);
       }
     });
     return () => sub.subscription.unsubscribe();
@@ -341,22 +345,15 @@ export default function MainDashboard() {
   }, []);
 
   useEffect(() => {
-    if (user) {
-      console.log("💾 Skipping localStorage save (user logged in)");
-      return;
-    }
+    // Don't save until we've loaded from storage (prevents overwriting with empty array)
+    if (!hasLoadedFromStorage.current) return;
+    if (user) return;
     try {
-      console.log(`💾 Saving ${items.length} items to localStorage (guest mode)`);
       localStorage.setItem(LOCAL_WISHLIST_KEY, JSON.stringify(items));
     } catch (err: any) {
       // Check if it's a quota error
       if (err?.name === "QuotaExceededError") {
-        console.error("⚠️ localStorage quota exceeded: cannot save all items");
-        // Could set a state to show warning to user, but keeping silent for now
-        // Future: Add warning banner
-      } else {
-        // Other errors (private mode, etc)
-        console.debug("localStorage unavailable:", err?.message);
+        console.error("localStorage quota exceeded");
       }
     }
   }, [items, user]);
@@ -366,9 +363,9 @@ export default function MainDashboard() {
     if (user) return;
     try {
       if (incomeInput) {
-        localStorage.setItem("borderless-buy-income", incomeInput);
+        localStorage.setItem(LOCAL_INCOME_KEY, incomeInput);
       } else {
-        localStorage.removeItem("borderless-buy-income");
+        localStorage.removeItem(LOCAL_INCOME_KEY);
       }
     } catch {
       // If storage fails, silently skip.
@@ -378,7 +375,7 @@ export default function MainDashboard() {
   // Sync income across tabs in real-time
   useEffect(() => {
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "borderless-buy-income") {
+      if (e.key === LOCAL_INCOME_KEY) {
         // Income changed in another tab
         if (e.newValue) {
           setIncomeInput(e.newValue);

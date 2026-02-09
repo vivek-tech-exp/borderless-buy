@@ -5,6 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "integration:test": "node scripts/integration.mjs",
+    "test": "node tests/simple-test.js",
+    "test:verbose": "node tests/simple-test.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
