@@ -184,30 +184,46 @@ export default function MainDashboard() {
           </div>
         </div>
 
-        {/* Sign-in prompt - subtle and elegant */}
-        <div className="flex items-center justify-center gap-2 text-sm">
+        {/* Sign-in prompt - prominent and inviting */}
+        <div className="flex items-center justify-center mt-1">
           {user ? (
-            <div className="flex items-center gap-3 px-4 py-2 rounded-[12px] bg-[var(--bg-secondary)] border border-[var(--border-primary)]">
-              <div className="text-[var(--text-secondary)]">Signed in as</div>
-              <div className="font-medium text-[var(--text-primary)] truncate max-w-[200px]">
+            <div className="flex items-center gap-3 px-5 py-2.5 rounded-full bg-[var(--bg-secondary)] border border-[var(--border-primary)] shadow-sm">
+              <div className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider">Signed in as</div>
+              <div className="font-semibold text-[var(--text-primary)] truncate max-w-[200px] text-sm">
                 {user.email ?? user.phone ?? user.id}
               </div>
               <button
                 onClick={() => setShowSignInModal(true)}
-                className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
+                className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors px-2 py-1 rounded-md hover:bg-[var(--bg-primary)]"
               >
                 Manage
               </button>
             </div>
           ) : (
-            <div className="text-[var(--text-secondary)]">
-              <span className="mr-1.5">💡</span>
-              Keep your upgrade plan forever.
+            <div className="flex flex-col sm:flex-row items-center gap-3 px-6 py-3 rounded-2xl border-2 border-dashed" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+              <div className="flex items-center gap-2.5">
+                <span className="text-xl">💡</span>
+                <span className="text-sm font-medium text-[var(--text-primary)]">
+                  Keep your upgrade plan forever.
+                </span>
+              </div>
               <button
                 onClick={() => setShowSignInModal(true)}
-                className="ml-1.5 font-medium text-[var(--accent-primary)] hover:text-[var(--accent-hover)] transition-colors underline"
+                className="px-5 py-2 rounded-lg font-semibold text-sm transition-all shadow-sm hover:shadow-md"
+                style={{
+                  backgroundColor: 'var(--accent-primary)',
+                  color: 'white'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--accent-hover)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--accent-primary)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
               >
-                Sign in
+                Sign in free
               </button>
             </div>
           )}
