@@ -211,8 +211,8 @@ If Valid:
         (entry) => entry && typeof entry.price === "number"
       );
 
-      if (!hasAnySource && !hasAnyPrice) {
-        return { error: "Product not found. Try a more specific query." };
+      if (!hasAnyPrice) {
+        return { error: "No reliable prices found. Try a more specific product." };
       }
 
       const product: Product = {

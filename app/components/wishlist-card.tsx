@@ -10,6 +10,10 @@ import { Card, CardContent, CardHeader } from "@/app/components/ui/card";
 import { ITEM_CHART_COLORS } from "@/app/lib/constants";
 import { Input } from "@/app/components/ui/input";
 
+function getGoogleSearchUrl(query: string) {
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+}
+
 export type ViewMode = "local" | "global";
 
 interface WishlistCardProps {
@@ -89,7 +93,8 @@ export function WishlistCard({
     (r): r is typeof r & { convertedPrice: number; convertedValid: true } =>
       r.convertedPrice != null && (r as any).convertedValid === true
   );
-  const best = withConverted.length
+  const hasPricing = withConverted.length > 0;
+  const best = hasPricing
     ? withConverted.reduce((a, b) => (a.convertedPrice <= b.convertedPrice ? a : b))
     : null;
 
@@ -125,6 +130,20 @@ export function WishlistCard({
     : null;
   const savings = bestMarket && homeCountryData?.convertedPrice != null
     ? homeCountryData.convertedPrice - bestMarket.convertedPrice
+    : null;
+
+  const productName = product.displayName;
+  const bestCountryName = bestMarket?.label;
+  const homeCountryName = COUNTRY_LABELS[preferredCountry];
+  const supportsPowerCheck = product.category === "tech";
+  const powerQuery = supportsPowerCheck && bestCountryName
+    ? `Does ${productName} bought in ${bestCountryName} work in ${homeCountryName} voltage?`
+    : null;
+  const warrantyQuery = bestCountryName
+    ? `Does ${productName} have global warranty if bought in ${bestCountryName} for ${homeCountryName}?`
+    : null;
+  const carryOnQuery = bestCountryName
+    ? `Is ${productName} allowed in carry-on flight luggage?`
     : null;
 
   const commitTag = () => {
@@ -327,6 +346,11 @@ export function WishlistCard({
                 <div style={{ backfaceVisibility: 'hidden' }}>
                   <div className="grid gap-3 sm:grid-cols-[1.4fr_1fr]">
                     <div className="rounded-xl border p-3" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+                      {!hasPricing && (
+                        <div className="text-sm" style={{color: 'var(--text-tertiary)'}}>
+                          No pricing found. Try a more specific product name.
+                        </div>
+                      )}
                       <div className="flex items-center justify-between">
                         <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
                           Arbitrage
@@ -337,7 +361,8 @@ export function WishlistCard({
                           </span>
                         )}
                       </div>
-                      <div className="mt-2 grid grid-cols-2 gap-2">
+                      {hasPricing && (
+                        <div className="mt-2 grid grid-cols-2 gap-2">
                         <div className="rounded-lg border p-2.5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}>
                           <p className="text-[10px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
                             Cheapest
@@ -371,7 +396,8 @@ export function WishlistCard({
                           )}
                         </div>
                       </div>
-                      {!incomeRatioLabel && (
+                      )}
+                      {!incomeRatioLabel && hasPricing && (
                         <button
                           type="button"
                           className="text-xs mt-2 transition-colors"
@@ -390,34 +416,71 @@ export function WishlistCard({
                         Logistics
                       </p>
                       <div className="mt-2 grid gap-2">
-                        <div className="flex items-center justify-between text-xs">
-                          <span>Power</span>
-                          <span style={{color: 'var(--text-tertiary)'}}>Check</span>
-                        </div>
+                        {supportsPowerCheck && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span>Power</span>
+                            {powerQuery ? (
+                              <a
+                                href={getGoogleSearchUrl(powerQuery)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-500 hover:underline text-xs"
+                              >
+                                Ask AI ↗
+                              </a>
+                            ) : (
+                              <span style={{color: 'var(--text-tertiary)'}}>Check</span>
+                            )}
+                          </div>
+                        )}
                         <div className="flex items-center justify-between text-xs">
                           <span>Warranty</span>
-                          <span style={{color: 'var(--text-tertiary)'}}>Varies</span>
+                          {warrantyQuery ? (
+                            <a
+                              href={getGoogleSearchUrl(warrantyQuery)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-500 hover:underline text-xs"
+                            >
+                              Ask AI ↗
+                            </a>
+                          ) : (
+                            <span style={{color: 'var(--text-tertiary)'}}>Varies</span>
+                          )}
                         </div>
                         <div className="flex items-center justify-between text-xs">
                           <span>Carry-on</span>
-                          <span style={{color: product.carryOnFriendly ? 'var(--accent-primary)' : 'var(--text-tertiary)'}}>
-                            {product.carryOnFriendly ? "Ready" : "Check"}
-                          </span>
+                          {carryOnQuery ? (
+                            <a
+                              href={getGoogleSearchUrl(carryOnQuery)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-500 hover:underline text-xs"
+                            >
+                              Ask AI ↗
+                            </a>
+                          ) : (
+                            <span style={{color: product.carryOnFriendly ? 'var(--accent-primary)' : 'var(--text-tertiary)'}}>
+                              {product.carryOnFriendly ? "Ready" : "Check"}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setIsFlipped(true)}
-                    className="w-full text-xs transition-colors py-2 text-right border-t mt-2 -mx-4 -mb-4 px-4"
-                    style={{borderColor: 'var(--border-primary)', color: 'var(--text-tertiary)'}}
-                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
-                  >
-                    See all markets
-                  </button>
+                  {hasPricing && (
+                    <button
+                      type="button"
+                      onClick={() => setIsFlipped(true)}
+                      className="w-full text-xs transition-colors py-2 text-right border-t mt-2 -mx-4 -mb-4 px-4"
+                      style={{borderColor: 'var(--border-primary)', color: 'var(--text-tertiary)'}}
+                      onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
+                    >
+                      See all markets
+                    </button>
+                  )}
                 </div>
 
                 {/* Back */}
