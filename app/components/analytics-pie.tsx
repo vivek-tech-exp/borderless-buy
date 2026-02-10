@@ -8,7 +8,7 @@ import {
   Legend,
   Sector,
 } from "recharts";
-import type { SectorProps } from "recharts";
+import type { LegendProps, SectorProps } from "recharts";
 import { useEffect, useRef, useState } from "react";
 import type { WishlistItem } from "@/types";
 import { COUNTRY_CODES, COUNTRY_LABELS } from "@/types";
@@ -115,6 +115,26 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
   const optimizedTotal = productsData.reduce((s, p) => s + p.bestValue, 0);
   const homeTotal = productsData.reduce((s, p) => s + (p.homeValue ?? p.bestValue), 0);
 
+  const renderLegend = ({ payload }: LegendProps) => {
+    if (!payload || payload.length === 0) return null;
+    return (
+      <ul className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs sm:text-sm leading-snug" style={{ color: 'var(--text-secondary)' }}>
+        {payload.map((entry) => (
+          <li key={entry.value} className="flex items-center gap-2">
+            <span
+              className="h-2.5 w-2.5 rounded-sm"
+              style={{ backgroundColor: entry.color }}
+              aria-hidden
+            />
+            <span className="max-w-[240px] break-words">
+              {String(entry.value)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
   if (data.length === 0) {
     return (
       <div className="flex h-[260px] items-center justify-center rounded-xl border text-sm" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-tertiary)'}}>
@@ -174,12 +194,12 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
               color: 'var(--text-primary)',
             }}
           >
-            <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            <div className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
               {activeEntry.name}
             </div>
             <div className="mt-1 flex items-center justify-between gap-3">
               <div>
-                <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                   Best in
                 </div>
                 <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -187,7 +207,7 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                   Cost
                 </div>
                 <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -200,7 +220,7 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
                 href={activeEntry.buyLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold transition-colors"
+                className="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold transition-colors"
                 style={{
                   backgroundColor: 'var(--bg-primary)',
                   color: 'var(--accent-primary)',
@@ -259,7 +279,7 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
                 <Cell key={entry.name} fill={entry.fill} />
               ))}
               </Pie>
-              <Legend />
+              <Legend content={renderLegend} />
             </PieChart>
           </ResponsiveContainer>
         </div>

@@ -587,11 +587,11 @@ export default function MainDashboard() {
         {/* Hero Section: Logo + Tagline + Currency + Info Button */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
           <div className="min-w-0 flex-1">
-            <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)] max-w-full" style={{textShadow: '0 6px 18px rgba(0,0,0,0.12)'}}>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--text-primary)] max-w-full" style={{textShadow: '0 6px 18px rgba(0,0,0,0.12)'}}>
               <span className="tracking-[0.04em]">ONE DAY, </span>
               <span className="tracking-[0.04em]" style={{color: 'var(--accent-primary)', textShadow: '0 8px 20px rgba(16,185,129,0.25)'}}>BABY</span>
             </h1>
-            <p className="mt-2 text-sm text-[var(--text-secondary)] max-w-full">
+            <p className="mt-2 text-sm sm:text-base leading-relaxed text-[var(--text-secondary)] max-w-full">
               Unapologetically Materialistic. Intelligently Sourced.
             </p>
           </div>
@@ -645,13 +645,13 @@ export default function MainDashboard() {
               <div className="flex items-center gap-2.5">
                 <span className="text-xl">💡</span>
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium text-[var(--text-primary)]">
+                  <span className="text-sm sm:text-base font-medium text-[var(--text-primary)]">
                     Keep your goals forever.
                   </span>
-                  <span className="text-[11px] text-[var(--text-tertiary)]">
+                  <span className="text-xs sm:text-sm text-[var(--text-tertiary)]">
                     Sign in to secure them—always free.
                   </span>
-                  <span className="text-[11px] text-[var(--text-tertiary)]">
+                  <span className="text-xs sm:text-sm text-[var(--text-tertiary)]">
                     Stored safely on this device until you do.
                   </span>
                 </div>
@@ -687,7 +687,7 @@ export default function MainDashboard() {
         <section className="mb-8">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <span className="hidden sm:inline text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>
+              <span className="hidden sm:inline text-xs uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>
                 View
               </span>
               <ViewModeToggle
@@ -698,7 +698,7 @@ export default function MainDashboard() {
             </div>
             <div className="flex flex-col items-start gap-1.5 sm:items-end group">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>
+                <span className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>
                   Income ({preferredCurrency})
                 </span>
                 <Input
@@ -724,7 +724,7 @@ export default function MainDashboard() {
                 </button>
               </div>
               <span
-                className="text-[11px] opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                className="text-xs opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
                 style={{ color: 'var(--text-tertiary)' }}
               >
                 Private on this device only. Never sent to servers.
@@ -736,7 +736,7 @@ export default function MainDashboard() {
 
       <section className="mb-12">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
+          <h2 className="text-sm sm:text-base font-medium text-[var(--text-secondary)] flex items-center gap-2">
             <svg className="h-4 w-4" style={{color: 'var(--accent-primary)'}} fill="currentColor" viewBox="0 0 20 20">
               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.381-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
             </svg>
@@ -765,7 +765,7 @@ export default function MainDashboard() {
         {availableTags.length > 0 && (
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+              <span className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
                 Goals
               </span>
               <span className="h-3 w-px" style={{backgroundColor: 'var(--border-primary)'}} aria-hidden />
@@ -806,10 +806,10 @@ export default function MainDashboard() {
                 </div>
               </div>
               <div className="space-y-2">
-                <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+                <h3 className="text-lg sm:text-xl font-semibold text-[var(--text-primary)]">
                   Your list is empty.
                 </h3>
-                <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                <p className="text-sm sm:text-base text-[var(--text-secondary)] leading-relaxed">
                   Start adding the things that matter to you. Whether it&apos;s a piece of tech, a vehicle, or a tool for your craft—let&apos;s find out what it really costs.
                 </p>
               </div>
@@ -833,7 +833,7 @@ export default function MainDashboard() {
           </div>
         ) : displayItems.length === 0 ? (
           <div className="rounded-[12px] border px-6 py-10 text-center" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
-            <p className="text-sm text-[var(--text-secondary)]">
+            <p className="text-sm sm:text-base text-[var(--text-secondary)]">
               No items match this tag yet.
             </p>
           </div>
@@ -859,7 +859,7 @@ export default function MainDashboard() {
       </section>
 
       <section className="mb-12">
-        <h2 className="mb-6 text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
+        <h2 className="mb-6 text-sm sm:text-base font-medium text-[var(--text-secondary)] flex items-center gap-2">
           <ChartPieIcon className="h-4 w-4" style={{color: 'var(--accent-primary)'}} />
           Price Comparison Across Markets
         </h2>
@@ -869,7 +869,7 @@ export default function MainDashboard() {
       {showTotals && (
         <section className="mb-12">
           <div className="mb-6 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
+            <h2 className="text-sm sm:text-base font-medium text-[var(--text-secondary)] flex items-center gap-2">
               <CurrencyDollarIcon className="h-4 w-4" style={{color: 'var(--accent-primary)'}} />
               Total if bought in one market
             </h2>
@@ -883,7 +883,7 @@ export default function MainDashboard() {
               {totalsExpanded ? "Hide" : "Show"}
             </button>
           </div>
-          <p className="mb-4 text-xs" style={{color: 'var(--text-tertiary)'}}>
+          <p className="mb-4 text-sm leading-relaxed" style={{color: 'var(--text-tertiary)'}}>
             A single-country total for all selected items. Compare your market against the best value total.
           </p>
           <div
@@ -913,13 +913,13 @@ export default function MainDashboard() {
                 <div className="mb-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl border px-4 py-3" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                      <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
                         Best value total
                       </p>
                       <select
                         value={effectiveBestCode ?? ""}
                         onChange={(e) => setSelectedBestCode(e.target.value)}
-                        className="rounded-md border px-2 py-1 text-[10px]"
+                        className="rounded-md border px-2 py-1 text-xs"
                         style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-secondary)'}}
                       >
                         {itemsByCountry.map((entry) => (
@@ -932,19 +932,19 @@ export default function MainDashboard() {
                     <p className="mt-1 text-lg font-semibold" style={{color: 'var(--accent-primary)'}}>
                       {effectiveBestMarket?.total ? formatCurrency(effectiveBestMarket.total, preferredCurrency) : "—"}
                     </p>
-                    <p className="text-[11px]" style={{color: 'var(--text-tertiary)'}}>
+                    <p className="text-xs" style={{color: 'var(--text-tertiary)'}}>
                       {effectiveBestMarket?.label ? `${effectiveBestMarket.label} selected` : "No totals available"}
                     </p>
                   </div>
                   <div className="rounded-2xl border px-4 py-3" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                      <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
                         Compare market
                       </p>
                       <select
                         value={effectiveCompareCode ?? ""}
                         onChange={(e) => setSelectedCompareCode(e.target.value)}
-                        className="rounded-md border px-2 py-1 text-[10px]"
+                        className="rounded-md border px-2 py-1 text-xs"
                         style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-secondary)'}}
                       >
                         {itemsByCountry.map((entry) => (
@@ -957,7 +957,7 @@ export default function MainDashboard() {
                     <p className="mt-1 text-lg font-semibold" style={{color: 'var(--text-primary)'}}>
                       {compareTotal > 0 ? formatCurrency(compareTotal, preferredCurrency) : "—"}
                     </p>
-                    <p className="text-[11px]" style={{color: 'var(--text-tertiary)'}}>
+                    <p className="text-xs" style={{color: 'var(--text-tertiary)'}}>
                       {compareSavings != null && compareSavings > 0
                         ? `About ${formatCurrency(compareSavings, preferredCurrency)} above the best value total`
                         : "Aligned with the best value total"}
@@ -996,7 +996,7 @@ export default function MainDashboard() {
                                   href={item.buyingLink}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="mt-0.5 inline-flex items-center gap-1 text-[10px]"
+                                  className="mt-0.5 inline-flex items-center gap-1 text-xs"
                                   style={{color: 'var(--accent-primary)'}}
                                   onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
                                   onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
@@ -1044,7 +1044,7 @@ export default function MainDashboard() {
                                   href={item.buyingLink}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="mt-0.5 inline-flex items-center gap-1 text-[10px]"
+                                  className="mt-0.5 inline-flex items-center gap-1 text-xs"
                                   style={{color: 'var(--accent-primary)'}}
                                   onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
                                   onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}

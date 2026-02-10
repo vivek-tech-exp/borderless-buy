@@ -193,13 +193,13 @@ export function WishlistCard({
           <div className="min-w-0 flex-1">
             <div className="relative group">
               <h3
-                className="text-lg font-semibold leading-snug sm:truncate"
+                className="text-base sm:text-lg font-semibold leading-snug sm:truncate"
                 style={{color: 'var(--text-primary)'}}
               >
                 {product.displayName}
               </h3>
               <div
-                className="pointer-events-none absolute left-0 top-full z-10 mt-1 max-w-[280px] rounded-md border px-2 py-1 text-[11px] opacity-0 transition-opacity group-hover:opacity-100"
+                className="pointer-events-none absolute left-0 top-full z-10 mt-1 max-w-[280px] rounded-md border px-2 py-1 text-xs opacity-0 transition-opacity group-hover:opacity-100"
                 style={{
                   backgroundColor: 'var(--bg-primary)',
                   borderColor: 'var(--border-primary)',
@@ -212,13 +212,13 @@ export function WishlistCard({
             <div className="flex items-center gap-2 mt-1">
               <div className="relative group min-w-0 flex-1">
                 <p
-                  className="text-[11px] sm:truncate"
+                  className="text-xs sm:truncate"
                   style={{color: 'var(--text-tertiary)'}}
                 >
                   {product.name}
                 </p>
                 <div
-                  className="pointer-events-none absolute left-0 top-full z-10 mt-1 max-w-[260px] rounded-md border px-2 py-1 text-[10px] opacity-0 transition-opacity group-hover:opacity-100"
+                  className="pointer-events-none absolute left-0 top-full z-10 mt-1 max-w-[260px] rounded-md border px-2 py-1 text-xs opacity-0 transition-opacity group-hover:opacity-100"
                   style={{
                     backgroundColor: 'var(--bg-primary)',
                     borderColor: 'var(--border-primary)',
@@ -234,7 +234,7 @@ export function WishlistCard({
                 <button
                   type="button"
                   onClick={() => setIsEditingTag(true)}
-                  className="text-[11px] rounded-full border px-2.5 py-1 transition-colors"
+                  className="text-xs rounded-full border px-2.5 py-1 transition-colors"
                   style={{borderColor: 'var(--border-primary)', color: 'var(--text-secondary)'}}
                 >
                   {item.tag ? `Goal: ${item.tag}` : "Set goal"}
@@ -301,7 +301,7 @@ export function WishlistCard({
               </button>
             )}
             <span
-              className="rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider"
+              className="rounded-full border px-2 py-0.5 text-xs uppercase tracking-wider"
               style={{backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', borderColor: 'var(--border-primary)'}}
               title={product.carryOnFriendly ? "Easy to buy abroad and carry home" : "Best purchased locally"}
             >
@@ -329,7 +329,7 @@ export function WishlistCard({
                   </div>
                   {incomeRatioLabel ? (
                     <div
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium"
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
                       style={{borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)', backgroundColor: 'var(--bg-secondary)'}}
                     >
                       <ClockIcon className="h-3.5 w-3.5" />
@@ -397,11 +397,11 @@ export function WishlistCard({
                         </div>
                       )}
                       <div className="flex items-center justify-between">
-                        <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                        <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
                           Arbitrage
                         </p>
                         {savings != null && savings > 0 && (
-                          <span className="text-[11px] font-medium" style={{color: 'var(--accent-primary)'}}>
+                          <span className="text-xs font-medium" style={{color: 'var(--accent-primary)'}}>
                             Save {formatCurrency(savings, preferredCurrency, { maxFractionDigits: 0 })}
                           </span>
                         )}
@@ -409,7 +409,7 @@ export function WishlistCard({
                       {hasPricing && (
                         <div className="mt-2 grid grid-cols-2 gap-2">
                         <div className="rounded-lg border p-2.5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}>
-                          <p className="text-[10px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                          <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
                             Best value
                           </p>
                           <p className="text-xs mt-1" style={{color: 'var(--text-secondary)'}}>
@@ -424,7 +424,7 @@ export function WishlistCard({
                                 href={best.buyingLink}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-[11px]"
+                                className="flex items-center gap-1 text-xs"
                                 style={{color: 'var(--accent-primary)'}}
                                 onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
                                 onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
@@ -435,13 +435,13 @@ export function WishlistCard({
                             </div>
                           )}
                           {bestRatio && (
-                            <p className="text-[10px] mt-0.5" style={{color: 'var(--text-tertiary)'}}>
+                            <p className="text-xs mt-0.5" style={{color: 'var(--text-tertiary)'}}>
                               {bestRatio.toFixed(2)}x income
                             </p>
                           )}
                         </div>
                         <div className="rounded-lg border p-2.5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}>
-                          <p className="text-[10px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                          <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
                             Home price
                           </p>
                           <p className="text-xs mt-1" style={{color: 'var(--text-secondary)'}}>
@@ -456,7 +456,7 @@ export function WishlistCard({
                                 href={homeCountryData.buyingLink}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-[11px]"
+                                className="flex items-center gap-1 text-xs"
                                 style={{color: 'var(--accent-primary)'}}
                                 onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
                                 onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
@@ -467,7 +467,7 @@ export function WishlistCard({
                             </div>
                           )}
                           {homeRatio && (
-                            <p className="text-[10px] mt-0.5" style={{color: 'var(--text-tertiary)'}}>
+                            <p className="text-xs mt-0.5" style={{color: 'var(--text-tertiary)'}}>
                               {homeRatio.toFixed(2)}x income
                             </p>
                           )}
@@ -489,7 +489,7 @@ export function WishlistCard({
                     </div>
 
                     <div className="rounded-xl border p-3" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
-                      <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                      <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
                         Logistics
                       </p>
                       <div className="mt-2 grid gap-2">
@@ -622,7 +622,7 @@ export function WishlistCard({
                             style={{backgroundColor: background, borderColor}}
                           >
                             <div className="grid grid-cols-[24px_1fr_auto] items-center gap-2">
-                              <div className="text-[11px] font-medium" style={{color: 'var(--text-tertiary)'}}>
+                              <div className="text-xs font-medium" style={{color: 'var(--text-tertiary)'}}>
                                 {index + 1}.
                               </div>
                               <div className="min-w-0">
@@ -631,17 +631,17 @@ export function WishlistCard({
                                     {row.label}
                                   </span>
                                   {isBest && (
-                                    <span className="text-[9px] uppercase tracking-wider" style={{color: 'var(--accent-primary)'}}>
+                                    <span className="text-xs uppercase tracking-wider" style={{color: 'var(--accent-primary)'}}>
                                       Best
                                     </span>
                                   )}
                                   {isHome && !isBest && (
-                                    <span className="text-[9px] uppercase tracking-wider" style={{color: '#f59e0b'}}>
+                                    <span className="text-xs uppercase tracking-wider" style={{color: '#f59e0b'}}>
                                       Home
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2 text-[10px]" style={{color: 'var(--text-tertiary)'}}>
+                                <div className="flex items-center gap-2 text-xs" style={{color: 'var(--text-tertiary)'}}>
                                   <span>
                                     {hasPrice
                                       ? formatCurrency(row.convertedPrice!, preferredCurrency, { maxFractionDigits: 0 })
@@ -661,7 +661,7 @@ export function WishlistCard({
                               </div>
                               <div className="flex items-center gap-2">
                                 {row.priceSource && (
-                                  <span className="text-[9px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                                    <span className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
                                     {row.priceSource}
                                   </span>
                                 )}
@@ -670,7 +670,7 @@ export function WishlistCard({
                                     href={row.buyingLink}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-[10px]"
+                                    className="text-xs"
                                     style={{color: 'var(--accent-primary)'}}
                                     onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
                                     onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}

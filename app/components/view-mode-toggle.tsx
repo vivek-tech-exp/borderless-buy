@@ -23,7 +23,7 @@ export function ViewModeToggle({ mode, onToggle, countryLabel }: ViewModeToggleP
         <button
           type="button"
           onClick={() => onToggle("global")}
-          className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
+          className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs sm:text-sm font-semibold transition-all"
           style={{
             backgroundColor: isGlobal ? 'var(--accent-primary)' : 'transparent',
             color: isGlobal ? 'white' : 'var(--text-secondary)',
@@ -37,7 +37,7 @@ export function ViewModeToggle({ mode, onToggle, countryLabel }: ViewModeToggleP
         <button
           type="button"
           onClick={() => onToggle("local")}
-          className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
+          className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs sm:text-sm font-semibold transition-all"
           style={{
             backgroundColor: !isGlobal ? 'var(--accent-primary)' : 'transparent',
             color: !isGlobal ? 'white' : 'var(--text-secondary)',
