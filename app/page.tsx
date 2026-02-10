@@ -34,6 +34,10 @@ export default function MainDashboard() {
   const [viewMode, setViewMode] = useState<ViewMode>("global");
   const [incomeInput, setIncomeInput] = useState<string>("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [expandCheapest, setExpandCheapest] = useState(true);
+  const [expandHome, setExpandHome] = useState(true);
+  const [selectedBestCode, setSelectedBestCode] = useState<string | null>(null);
+  const [selectedCompareCode, setSelectedCompareCode] = useState<string | null>(null);
   const hasLoadedFromStorage = useRef(false);
 
   const { convertToPreferred, preferredCurrency, preferredCountry } = useCurrency();
@@ -231,6 +235,19 @@ export default function MainDashboard() {
     setDefault();
     mediaQuery.addEventListener("change", setDefault);
     return () => mediaQuery.removeEventListener("change", setDefault);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mediaQuery = window.matchMedia("(min-width: 640px)");
+    const setDetailsDefault = () => {
+      const isDesktop = mediaQuery.matches;
+      setExpandCheapest(isDesktop);
+      setExpandHome(isDesktop);
+    };
+    setDetailsDefault();
+    mediaQuery.addEventListener("change", setDetailsDefault);
+    return () => mediaQuery.removeEventListener("change", setDetailsDefault);
   }, []);
 
   // Load and persist view mode preference
@@ -509,6 +526,29 @@ export default function MainDashboard() {
     }, 0);
     return { code, label: COUNTRY_LABELS[code], total };
   });
+  const itemsByCountry = COUNTRY_CODES.map((code) => {
+    const entries = itemsForTotals
+      .map((item) => {
+        const p = item.product.pricing[code];
+        if (!p || p.price === null) return null;
+        return {
+          id: item.id,
+          name: item.product.displayName,
+          converted: convertToPreferred(p.price, p.currency),
+          priceSource: p.priceSource,
+          buyingLink: p.buyingLink,
+        };
+      })
+      .filter(Boolean) as Array<{
+      id: string;
+      name: string;
+      converted: number;
+      priceSource?: string;
+      buyingLink?: string;
+    }>;
+
+    return { code, label: COUNTRY_LABELS[code], items: entries };
+  }).filter((entry) => entry.items.length > 0);
   const bestTotal = totalsByCountry.reduce(
     (min, t) => (t.total > 0 && (min === 0 || t.total < min) ? t.total : min),
     0
@@ -519,19 +559,39 @@ export default function MainDashboard() {
   );
   const homeTotal = totalsByCountry.find((t) => t.code === preferredCountry)?.total ?? 0;
   const potentialSavings = bestTotal > 0 && homeTotal > 0 ? homeTotal - bestTotal : null;
+  const availableMarketCodes = itemsByCountry.map((entry) => entry.code);
+  const effectiveBestCode = selectedBestCode && availableMarketCodes.includes(selectedBestCode as keyof typeof COUNTRY_LABELS)
+    ? selectedBestCode
+    : bestMarket?.code ?? preferredCountry;
+  const effectiveCompareCode = selectedCompareCode && availableMarketCodes.includes(selectedCompareCode as keyof typeof COUNTRY_LABELS)
+    ? selectedCompareCode
+    : preferredCountry;
+  const effectiveBestMarket = totalsByCountry.find((t) => t.code === effectiveBestCode) ?? null;
+  const effectiveCompareMarket = totalsByCountry.find((t) => t.code === effectiveCompareCode) ?? null;
+  const compareTotal = effectiveCompareMarket?.total ?? 0;
+  const compareSavings = bestTotal > 0 && compareTotal > 0 ? compareTotal - bestTotal : null;
+
+  useEffect(() => {
+    if (!bestMarket) return;
+    if (!selectedBestCode) setSelectedBestCode(bestMarket.code);
+  }, [bestMarket, selectedBestCode]);
+
+  useEffect(() => {
+    if (!selectedCompareCode) setSelectedCompareCode(preferredCountry);
+  }, [preferredCountry, selectedCompareCode]);
   const showTotals = itemsForTotals.length > 0;
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
       <header className="mb-12">
         {/* Hero Section: Logo + Tagline + Currency + Info Button */}
-        <div className="flex items-start justify-between gap-4 mb-8">
-          <div className="flex-1">
-            <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]" style={{textShadow: '0 6px 18px rgba(0,0,0,0.12)'}}>
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)] max-w-full" style={{textShadow: '0 6px 18px rgba(0,0,0,0.12)'}}>
               <span className="tracking-[0.04em]">ONE DAY, </span>
               <span className="tracking-[0.04em]" style={{color: 'var(--accent-primary)', textShadow: '0 8px 20px rgba(16,185,129,0.25)'}}>BABY</span>
             </h1>
-            <p className="mt-2 text-sm text-[var(--text-secondary)]">
+            <p className="mt-2 text-sm text-[var(--text-secondary)] max-w-full">
               Unapologetically Materialistic. Intelligently Sourced.
             </p>
           </div>
@@ -778,9 +838,9 @@ export default function MainDashboard() {
             </p>
           </div>
         ) : (
-          <ul className="grid gap-4 lg:grid-cols-2">
+          <ul className="grid w-full gap-4 lg:grid-cols-2">
             {displayItems.map((item) => (
-              <li key={item.id}>
+              <li key={item.id} className="min-w-0">
                 <WishlistCard
                   item={item}
                   selected={selectedIds.has(item.id)}
@@ -824,7 +884,7 @@ export default function MainDashboard() {
             </button>
           </div>
           <p className="mb-4 text-xs" style={{color: 'var(--text-tertiary)'}}>
-            A single-country total for all selected items. Compare your market against the best overall.
+            A single-country total for all selected items. Compare your market against the lowest total.
           </p>
           <div
             id="totals-panel"
@@ -852,29 +912,155 @@ export default function MainDashboard() {
               <>
                 <div className="mb-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl border px-4 py-3" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
-                    <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                      Best total
-                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                        Best total
+                      </p>
+                      <select
+                        value={effectiveBestCode ?? ""}
+                        onChange={(e) => setSelectedBestCode(e.target.value)}
+                        className="rounded-md border px-2 py-1 text-[10px]"
+                        style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-secondary)'}}
+                      >
+                        {itemsByCountry.map((entry) => (
+                          <option key={entry.code} value={entry.code}>
+                            {entry.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <p className="mt-1 text-lg font-semibold" style={{color: 'var(--accent-primary)'}}>
-                      {bestMarket?.total ? formatCurrency(bestMarket.total, preferredCurrency) : "—"}
+                      {effectiveBestMarket?.total ? formatCurrency(effectiveBestMarket.total, preferredCurrency) : "—"}
                     </p>
                     <p className="text-[11px]" style={{color: 'var(--text-tertiary)'}}>
-                      {bestMarket?.label ? `${bestMarket.label} is lowest overall` : "No totals available"}
+                      {effectiveBestMarket?.label ? `${effectiveBestMarket.label} selected` : "No totals available"}
                     </p>
                   </div>
                   <div className="rounded-2xl border px-4 py-3" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
-                    <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                      Your market
-                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                        Compare market
+                      </p>
+                      <select
+                        value={effectiveCompareCode ?? ""}
+                        onChange={(e) => setSelectedCompareCode(e.target.value)}
+                        className="rounded-md border px-2 py-1 text-[10px]"
+                        style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-secondary)'}}
+                      >
+                        {itemsByCountry.map((entry) => (
+                          <option key={entry.code} value={entry.code}>
+                            {entry.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <p className="mt-1 text-lg font-semibold" style={{color: 'var(--text-primary)'}}>
-                      {homeTotal > 0 ? formatCurrency(homeTotal, preferredCurrency) : "—"}
+                      {compareTotal > 0 ? formatCurrency(compareTotal, preferredCurrency) : "—"}
                     </p>
                     <p className="text-[11px]" style={{color: 'var(--text-tertiary)'}}>
-                      {potentialSavings != null && potentialSavings > 0
-                        ? `About ${formatCurrency(potentialSavings, preferredCurrency)} above the best total`
+                      {compareSavings != null && compareSavings > 0
+                        ? `About ${formatCurrency(compareSavings, preferredCurrency)} above the best total`
                         : "Aligned with the best total"}
                     </p>
                   </div>
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {effectiveBestMarket && (
+                    <details
+                      className="rounded-2xl border p-4"
+                      style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}
+                      open={expandCheapest}
+                      onToggle={(e) => setExpandCheapest((e.target as HTMLDetailsElement).open)}
+                    >
+                      <summary className="cursor-pointer text-xs font-medium" style={{color: 'var(--text-secondary)'}}>
+                        Selected market: {effectiveBestMarket.label}
+                      </summary>
+                      <div className="mt-3 space-y-3">
+                        {(itemsByCountry.find((entry) => entry.code === effectiveBestCode)?.items ?? []).map((item) => (
+                          <div
+                            key={`${effectiveBestCode}-${item.id}`}
+                            className="flex items-start justify-between gap-3 border-b pb-3 last:border-b-0 last:pb-0"
+                            style={{borderColor: 'var(--border-primary)'}}
+                          >
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium truncate" style={{color: 'var(--text-secondary)'}} title={item.name}>
+                                {item.name}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-semibold" style={{color: 'var(--text-primary)'}}>
+                                {formatCurrency(item.converted, preferredCurrency, { maxFractionDigits: 0 })}
+                              </div>
+                              {item.buyingLink && (
+                                <a
+                                  href={item.buyingLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-0.5 inline-flex items-center gap-1 text-[10px]"
+                                  style={{color: 'var(--accent-primary)'}}
+                                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+                                >
+                                  <span className="max-w-[110px] truncate">
+                                    {item.priceSource ?? "Buy"}
+                                  </span>
+                                  <span aria-hidden>↗</span>
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                  {itemsByCountry.find((entry) => entry.code === effectiveCompareCode) && (
+                    <details
+                      className="rounded-2xl border p-4"
+                      style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}
+                      open={expandHome}
+                      onToggle={(e) => setExpandHome((e.target as HTMLDetailsElement).open)}
+                    >
+                      <summary className="cursor-pointer text-xs font-medium" style={{color: 'var(--text-secondary)'}}>
+                        Compare market: {COUNTRY_LABELS[effectiveCompareCode as keyof typeof COUNTRY_LABELS]}
+                      </summary>
+                      <div className="mt-3 space-y-3">
+                        {(itemsByCountry.find((entry) => entry.code === effectiveCompareCode)?.items ?? []).map((item) => (
+                          <div
+                            key={`${effectiveCompareCode}-${item.id}`}
+                            className="flex items-start justify-between gap-3 border-b pb-3 last:border-b-0 last:pb-0"
+                            style={{borderColor: 'var(--border-primary)'}}
+                          >
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium truncate" style={{color: 'var(--text-secondary)'}} title={item.name}>
+                                {item.name}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-semibold" style={{color: 'var(--text-primary)'}}>
+                                {formatCurrency(item.converted, preferredCurrency, { maxFractionDigits: 0 })}
+                              </div>
+                              {item.buyingLink && (
+                                <a
+                                  href={item.buyingLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-0.5 inline-flex items-center gap-1 text-[10px]"
+                                  style={{color: 'var(--accent-primary)'}}
+                                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+                                >
+                                  <span className="max-w-[110px] truncate">
+                                    {item.priceSource ?? "Buy"}
+                                  </span>
+                                  <span aria-hidden>↗</span>
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
                 </div>
               </>
             )}

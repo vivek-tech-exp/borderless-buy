@@ -75,9 +75,10 @@
   --divider: #f3f4f6;
 }
 
-body {
+html, body {
   color: var(--text-primary);
   background-color: var(--bg-primary);
+  overflow-x: hidden;
 }
 
 .recharts-wrapper:focus,

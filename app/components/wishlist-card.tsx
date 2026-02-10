@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ClockIcon, TrashIcon } from "@heroicons/react/24/outline";
 import type { WishlistItem } from "@/types";
 import { COUNTRY_CODES, COUNTRY_LABELS } from "@/types";
@@ -48,12 +48,15 @@ export function WishlistCard({
   const [isFlipped, setIsFlipped] = useState(false);
   const [isEditingTag, setIsEditingTag] = useState(false);
   const [tagInput, setTagInput] = useState(item.tag ?? "");
+  const [leaderboardAtEnd, setLeaderboardAtEnd] = useState(false);
+  const leaderboardRef = useRef<HTMLDivElement | null>(null);
   const { convertToPreferred, preferredCurrency, preferredCountry, rates } = useCurrency();
   const { product } = item;
 
   useEffect(() => {
     setTagInput(item.tag ?? "");
   }, [item.tag]);
+
 
 
   const pricesByCountry = COUNTRY_CODES.map((code) => {
@@ -121,6 +124,14 @@ export function WishlistCard({
     ? [...withoutHome.slice(0, maxRanks - 1), homeInSorted]
     : withoutHome.slice(0, maxRanks);
 
+  useEffect(() => {
+    const el = leaderboardRef.current;
+    if (!el) return;
+    const noScroll = el.scrollHeight <= el.clientHeight + 1;
+    const atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+    setLeaderboardAtEnd(noScroll || atEnd);
+  }, [leaderboard.length, isFlipped]);
+
   const showIncome = Number.isFinite(incomeAmount) && (incomeAmount ?? 0) > 0;
   const bestRatio = showIncome && bestMarket?.convertedPrice
     ? bestMarket.convertedPrice / (incomeAmount as number)
@@ -163,7 +174,7 @@ export function WishlistCard({
 
   return (
     <Card
-      className={`overflow-hidden transition-all ${
+      className={`w-full max-w-full overflow-hidden transition-all ${
         isHovered ? "ring-2 ring-emerald-500/50" : ""
       }`}
       onMouseEnter={onMouseEnter}
@@ -180,18 +191,43 @@ export function WishlistCard({
             aria-label={`Select ${product.displayName}`}
           />
           <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-semibold leading-snug" style={{color: 'var(--text-primary)'}}>
-              {product.displayName}
-            </h3>
-            <div className="flex items-center justify-between gap-2 mt-1">
-              <p className="text-[11px]" style={{color: 'var(--text-tertiary)'}}>{product.name}</p>
-              <span
-                className="shrink-0 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider"
-                style={{backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', borderColor: 'var(--border-primary)'}}
-                title={product.carryOnFriendly ? "Easy to buy abroad and carry home" : "Best purchased locally"}
+            <div className="relative group">
+              <h3
+                className="text-lg font-semibold leading-snug truncate"
+                style={{color: 'var(--text-primary)'}}
               >
-                {product.carryOnFriendly ? "Buy abroad" : "Buy local"}
-              </span>
+                {product.displayName}
+              </h3>
+              <div
+                className="pointer-events-none absolute left-0 top-full z-10 mt-1 max-w-[280px] rounded-md border px-2 py-1 text-[11px] opacity-0 transition-opacity group-hover:opacity-100"
+                style={{
+                  backgroundColor: 'var(--bg-primary)',
+                  borderColor: 'var(--border-primary)',
+                  color: 'var(--text-secondary)'
+                }}
+              >
+                {product.displayName}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="relative group min-w-0 flex-1">
+                <p
+                  className="text-[11px] truncate"
+                  style={{color: 'var(--text-tertiary)'}}
+                >
+                  {product.name}
+                </p>
+                <div
+                  className="pointer-events-none absolute left-0 top-full z-10 mt-1 max-w-[260px] rounded-md border px-2 py-1 text-[10px] opacity-0 transition-opacity group-hover:opacity-100"
+                  style={{
+                    backgroundColor: 'var(--bg-primary)',
+                    borderColor: 'var(--border-primary)',
+                    color: 'var(--text-tertiary)'
+                  }}
+                >
+                  {product.name}
+                </div>
+              </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-2">
               {!isEditingTag && (
@@ -249,20 +285,29 @@ export function WishlistCard({
               )}
             </div>
           </div>
-          {onRemove && (
-            <button
-              type="button"
-              onClick={() => onRemove(item.id)}
-              className="shrink-0 transition-colors p-1"
-              style={{color: 'var(--text-tertiary)'}}
-              onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
-              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
-              title="Remove item"
-              aria-label="Remove"
+          <div className="shrink-0 flex flex-col items-end gap-2">
+            {onRemove && (
+              <button
+                type="button"
+                onClick={() => onRemove(item.id)}
+                className="transition-colors p-1"
+                style={{color: 'var(--text-tertiary)'}}
+                onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
+                title="Remove item"
+                aria-label="Remove"
+              >
+                <TrashIcon className="w-5 h-5" />
+              </button>
+            )}
+            <span
+              className="rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider"
+              style={{backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', borderColor: 'var(--border-primary)'}}
+              title={product.carryOnFriendly ? "Easy to buy abroad and carry home" : "Best purchased locally"}
             >
-              <TrashIcon className="w-5 h-5" />
-            </button>
-          )}
+              {product.carryOnFriendly ? "Buy abroad" : "Buy local"}
+            </span>
+          </div>
         </div>
       </CardHeader>
 
@@ -374,17 +419,20 @@ export function WishlistCard({
                             {best ? formatCurrency(best.convertedPrice, preferredCurrency, { maxFractionDigits: 0 }) : "—"}
                           </p>
                           {best?.priceSource && best?.buyingLink && (
-                            <a
-                              href={best.buyingLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[11px] mt-1 inline-block"
-                              style={{color: 'var(--accent-primary)'}}
-                              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
-                              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
-                            >
-                              {best.priceSource} ↗
-                            </a>
+                            <div className="mt-1 max-w-full overflow-hidden">
+                              <a
+                                href={best.buyingLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-[11px]"
+                                style={{color: 'var(--accent-primary)'}}
+                                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+                              >
+                                <span className="min-w-0 flex-1 truncate">{best.priceSource}</span>
+                                <span aria-hidden>↗</span>
+                              </a>
+                            </div>
                           )}
                           {bestRatio && (
                             <p className="text-[10px] mt-0.5" style={{color: 'var(--text-tertiary)'}}>
@@ -403,17 +451,20 @@ export function WishlistCard({
                             {hasHomePrice ? formatCurrency(homeCountryData!.convertedPrice!, preferredCurrency, { maxFractionDigits: 0 }) : "—"}
                           </p>
                           {homeCountryData?.priceSource && homeCountryData?.buyingLink && (
-                            <a
-                              href={homeCountryData.buyingLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[11px] mt-1 inline-block"
-                              style={{color: 'var(--accent-primary)'}}
-                              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
-                              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
-                            >
-                              {homeCountryData.priceSource} ↗
-                            </a>
+                            <div className="mt-1 max-w-full overflow-hidden">
+                              <a
+                                href={homeCountryData.buyingLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-[11px]"
+                                style={{color: 'var(--accent-primary)'}}
+                                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+                              >
+                                <span className="min-w-0 flex-1 truncate">{homeCountryData.priceSource}</span>
+                                <span aria-hidden>↗</span>
+                              </a>
+                            </div>
                           )}
                           {homeRatio && (
                             <p className="text-[10px] mt-0.5" style={{color: 'var(--text-tertiary)'}}>
@@ -531,7 +582,24 @@ export function WishlistCard({
                       </button>
                     </div>
                     <div className="relative">
-                      <div className="max-h-[280px] overflow-y-auto pr-1 space-y-2">
+                      <div
+                        ref={leaderboardRef}
+                        className="max-h-[280px] overflow-y-auto pr-1 space-y-2"
+                        onScroll={(e) => {
+                          const el = e.currentTarget;
+                          const noScroll = el.scrollHeight <= el.clientHeight + 1;
+                          const atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+                          const next = noScroll || atEnd;
+                          if (next !== leaderboardAtEnd) setLeaderboardAtEnd(next);
+                        }}
+                        onMouseEnter={(e) => {
+                          const el = e.currentTarget;
+                          const noScroll = el.scrollHeight <= el.clientHeight + 1;
+                          const atEnd = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+                          const next = noScroll || atEnd;
+                          if (next !== leaderboardAtEnd) setLeaderboardAtEnd(next);
+                        }}
+                      >
                       {leaderboard.map((row, index) => {
                         const isBest = bestMarket?.code === row.code;
                         const isHome = row.code === preferredCountry;
@@ -616,11 +684,13 @@ export function WishlistCard({
                         );
                       })}
                       </div>
-                      <div
-                        className="pointer-events-none absolute bottom-0 left-0 h-6 w-full"
-                        style={{background: 'linear-gradient(180deg, rgba(0,0,0,0), var(--bg-primary))'}}
-                        aria-hidden
-                      />
+                      {!leaderboardAtEnd && (
+                        <div
+                          className="pointer-events-none absolute bottom-0 left-0 h-6 w-full"
+                          style={{background: 'linear-gradient(180deg, rgba(0,0,0,0), var(--bg-primary))'}}
+                          aria-hidden
+                        />
+                      )}
                     </div>
                   </div>
                 </div>
