@@ -58,10 +58,6 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
       {error && (
         <p className="text-sm text-red-400">{error}</p>
       )}
-      <p className="text-xs text-[var(--text-tertiary)] flex items-start gap-2">
-        <LightBulbIcon className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" style={{color: 'var(--text-tertiary)'}} />
-        <span>Sign in to keep your goals forever. Your future self will thank you!</span>
-      </p>
     </form>
   );
 }

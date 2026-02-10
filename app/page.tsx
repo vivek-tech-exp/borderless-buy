@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { GlobeAltIcon, ChartPieIcon, CurrencyDollarIcon, BellAlertIcon } from "@heroicons/react/24/outline";
+import { GlobeAltIcon, ChartPieIcon, CurrencyDollarIcon, BellAlertIcon, LockClosedIcon } from "@heroicons/react/24/outline";
 import { AddItemForm } from "@/app/components/add-item-form";
 import { WishlistCard } from "@/app/components/wishlist-card";
 import { AnalyticsPie } from "@/app/components/analytics-pie";
@@ -540,9 +540,17 @@ export default function MainDashboard() {
             <div className="flex flex-col sm:flex-row items-center gap-3 px-6 py-3 rounded-2xl border-2 border-dashed" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
               <div className="flex items-center gap-2.5">
                 <span className="text-xl">💡</span>
-                <span className="text-sm font-medium text-[var(--text-primary)]">
-                  Keep your goals forever.
-                </span>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-[var(--text-primary)]">
+                    Keep your goals forever.
+                  </span>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">
+                    Sign in to secure them—always free.
+                  </span>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">
+                    Stored safely on this device until you do.
+                  </span>
+                </div>
               </div>
               <button
                 onClick={() => setShowSignInModal(true)}
@@ -567,47 +575,27 @@ export default function MainDashboard() {
         </div>
       </header>
 
-      {items.length > 0 && !user && (
-        <section className="mb-12 rounded-lg border p-4 flex items-start gap-3" style={{borderColor: 'var(--status-warning-border)', backgroundColor: 'var(--status-warning-bg)'}}>
-          <BellAlertIcon className="h-5 w-5 mt-0.5 flex-shrink-0" style={{color: 'var(--status-warning-border)'}} />
-          <div className="flex-1">
-            <p className="text-sm" style={{color: 'var(--status-warning-text)'}}>
-              <span className="font-medium">Your goals are temporary.</span> Sign in to lock them in forever—it's free!
-            </p>
-            <p className="text-xs mt-1.5" style={{color: 'var(--status-warning-text)', opacity: 0.8}}>
-              💾 Stored safely on this device until you sign in.
-            </p>
-          </div>
-        </section>
-      )}
-
       <section className="mb-12">
         <AddItemForm onAdd={handleAdd} />
       </section>
 
       {items.length > 0 && (
         <section className="mb-8">
-          <div
-            className="grid gap-4 rounded-2xl border px-4 py-3 sm:grid-cols-[1fr,auto] sm:items-center"
-            style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}
-          >
-            <div className="flex flex-col gap-2">
-              <div className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>
-                Pricing view
-              </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <span className="hidden sm:inline text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>
+                View
+              </span>
               <ViewModeToggle
                 mode={viewMode}
                 onToggle={handleViewModeChange}
                 countryLabel={COUNTRY_LABELS[preferredCountry]}
               />
-              <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                Compare global prices or focus on your home market.
-              </div>
             </div>
-            <div className="flex flex-col gap-2 sm:items-end">
-              <label className="flex flex-col gap-1">
+            <div className="flex flex-col items-start gap-1.5 sm:items-end group">
+              <div className="flex items-center gap-2">
                 <span className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>
-                  Monthly income ({preferredCurrency})
+                  Income ({preferredCurrency})
                 </span>
                 <Input
                   id="income-input"
@@ -618,20 +606,24 @@ export default function MainDashboard() {
                   placeholder="0"
                   value={incomeInput}
                   onChange={handleIncomeChange}
-                  className="h-10 w-40 px-3 text-sm"
+                  className="h-9 w-32 px-3 text-sm"
                   aria-label="Monthly income"
                 />
-              </label>
-              <span className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
-                Private on this device only. Not sent to servers.{" "}
-                <a
-                  href="/docs/SECURITY_AUDIT.md"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline hover:opacity-75 transition-opacity"
+                <button
+                  type="button"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full transition-opacity hover:opacity-75"
+                  style={{ color: 'var(--text-tertiary)' }}
+                  title="Private on this device only. Never sent to servers."
+                  aria-label="Income privacy details"
                 >
-                  Learn more
-                </a>
+                  <LockClosedIcon className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <span
+                className="text-[11px] opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100"
+                style={{ color: 'var(--text-tertiary)' }}
+              >
+                Private on this device only. Never sent to servers.
               </span>
             </div>
           </div>
