@@ -123,10 +123,10 @@ export function WishlistCard({
 
   const showIncome = Number.isFinite(incomeAmount) && (incomeAmount ?? 0) > 0;
   const bestRatio = showIncome && bestMarket?.convertedPrice
-    ? bestMarket.convertedPrice / incomeAmount
+    ? bestMarket.convertedPrice / (incomeAmount as number)
     : null;
   const homeRatio = showIncome && homeCountryData?.convertedPrice != null
-    ? homeCountryData.convertedPrice / incomeAmount
+    ? homeCountryData.convertedPrice / (incomeAmount as number)
     : null;
   const savings = bestMarket && homeCountryData?.convertedPrice != null
     ? homeCountryData.convertedPrice - bestMarket.convertedPrice
@@ -373,6 +373,19 @@ export function WishlistCard({
                           <p className="text-sm font-semibold mt-1" style={{color: 'var(--text-primary)'}}>
                             {best ? formatCurrency(best.convertedPrice, preferredCurrency, { maxFractionDigits: 0 }) : "—"}
                           </p>
+                          {best?.priceSource && best?.buyingLink && (
+                            <a
+                              href={best.buyingLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[11px] mt-1 inline-block"
+                              style={{color: 'var(--accent-primary)'}}
+                              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+                            >
+                              {best.priceSource} ↗
+                            </a>
+                          )}
                           {bestRatio && (
                             <p className="text-[10px] mt-0.5" style={{color: 'var(--text-tertiary)'}}>
                               {bestRatio.toFixed(1)}x income
@@ -389,6 +402,19 @@ export function WishlistCard({
                           <p className="text-sm font-semibold mt-1" style={{color: 'var(--text-primary)'}}>
                             {hasHomePrice ? formatCurrency(homeCountryData!.convertedPrice!, preferredCurrency, { maxFractionDigits: 0 }) : "—"}
                           </p>
+                          {homeCountryData?.priceSource && homeCountryData?.buyingLink && (
+                            <a
+                              href={homeCountryData.buyingLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[11px] mt-1 inline-block"
+                              style={{color: 'var(--accent-primary)'}}
+                              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+                            >
+                              {homeCountryData.priceSource} ↗
+                            </a>
+                          )}
                           {homeRatio && (
                             <p className="text-[10px] mt-0.5" style={{color: 'var(--text-tertiary)'}}>
                               {homeRatio.toFixed(1)}x income
@@ -560,7 +586,7 @@ export function WishlistCard({
                                   )}
                                   {showIncome && hasPrice && (
                                     <span>
-                                      {(row.convertedPrice / incomeAmount).toFixed(1)}x income
+                                      {(row.convertedPrice / (incomeAmount as number)).toFixed(1)}x income
                                     </span>
                                   )}
                                 </div>
