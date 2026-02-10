@@ -8,7 +8,7 @@ import {
   Legend,
   Sector,
 } from "recharts";
-import type { LegendProps, SectorProps } from "recharts";
+import type { SectorProps } from "recharts";
 import { useEffect, useRef, useState } from "react";
 import type { WishlistItem } from "@/types";
 import { COUNTRY_CODES, COUNTRY_LABELS } from "@/types";
@@ -115,12 +115,13 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
   const optimizedTotal = productsData.reduce((s, p) => s + p.bestValue, 0);
   const homeTotal = productsData.reduce((s, p) => s + (p.homeValue ?? p.bestValue), 0);
 
-  const renderLegend = ({ payload }: LegendProps) => {
+  const renderLegend = (props: { payload?: Array<{ value?: string; color?: string }> }) => {
+    const { payload } = props;
     if (!payload || payload.length === 0) return null;
     return (
       <ul className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs sm:text-sm leading-snug" style={{ color: 'var(--text-secondary)' }}>
         {payload.map((entry) => (
-          <li key={entry.value} className="flex items-center gap-2">
+          <li key={entry.value ?? "legend"} className="flex items-center gap-2">
             <span
               className="h-2.5 w-2.5 rounded-sm"
               style={{ backgroundColor: entry.color }}
