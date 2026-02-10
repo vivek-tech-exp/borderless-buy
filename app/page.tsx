@@ -520,13 +520,17 @@ export default function MainDashboard() {
   const itemsForTotals = selectedTag ? displayItems : selectedItems;
   const chartItems = itemsForTotals;
 
+  const coverageThreshold = 0.8;
+  const totalItems = itemsForTotals.length;
   const totalsByCountry = COUNTRY_CODES.map((code) => {
+    let count = 0;
     const total = itemsForTotals.reduce((sum, item) => {
       const p = item.product.pricing[code];
       if (!p || p.price === null) return sum;
+      count += 1;
       return sum + convertToPreferred(p.price, p.currency);
     }, 0);
-    return { code, label: COUNTRY_LABELS[code], total };
+    return { code, label: COUNTRY_LABELS[code], total, count };
   });
   const itemsByCountry = COUNTRY_CODES.map((code) => {
     const entries = itemsForTotals
@@ -551,17 +555,24 @@ export default function MainDashboard() {
 
     return { code, label: COUNTRY_LABELS[code], items: entries };
   }).filter((entry) => entry.items.length > 0);
-  const bestTotal = totalsByCountry.reduce(
-    (min, t) => (t.total > 0 && (min === 0 || t.total < min) ? t.total : min),
-    0
+  const eligibleTotals = totalsByCountry.filter((t) =>
+    totalItems > 0 && t.total > 0 && t.count / totalItems >= coverageThreshold
   );
-  const bestMarket = totalsByCountry.reduce(
+  const totalsForRanking = eligibleTotals.length > 0
+    ? eligibleTotals
+    : totalsByCountry.filter((t) => t.total > 0);
+  const bestMarket = totalsForRanking.reduce(
     (best, t) => (t.total > 0 && (!best || t.total < best.total) ? t : best),
-    null as { code: string; label: string; total: number } | null
+    null as { code: string; label: string; total: number; count: number } | null
   );
+  const bestTotal = bestMarket?.total ?? 0;
   const homeTotal = totalsByCountry.find((t) => t.code === preferredCountry)?.total ?? 0;
   const potentialSavings = bestTotal > 0 && homeTotal > 0 ? homeTotal - bestTotal : null;
-  const availableMarketCodes = itemsByCountry.map((entry) => entry.code);
+  const eligibleMarketCodes = eligibleTotals.map((entry) => entry.code);
+  const marketList = eligibleMarketCodes.length > 0
+    ? itemsByCountry.filter((entry) => eligibleMarketCodes.includes(entry.code as keyof typeof COUNTRY_LABELS))
+    : itemsByCountry;
+  const availableMarketCodes = marketList.map((entry) => entry.code);
   const effectiveBestCode = selectedBestCode && availableMarketCodes.includes(selectedBestCode as keyof typeof COUNTRY_LABELS)
     ? selectedBestCode
     : bestMarket?.code ?? preferredCountry;
@@ -888,13 +899,21 @@ export default function MainDashboard() {
                 <div className="flex h-9 w-9 items-center justify-center rounded-full" style={{backgroundColor: 'var(--accent-light)', color: 'var(--accent-primary)'}}>
                   <CurrencyDollarIcon className="h-4 w-4" />
                 </div>
-                <div>
+                <div className="flex flex-col gap-1">
                   <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                    Compare markets
+                    Market comparison
                   </p>
                   <h2 className="text-base sm:text-lg font-semibold" style={{color: 'var(--text-primary)'}}>
-                    Total if bought in one market
+                    Best total for your list
                   </h2>
+                  <div className="flex flex-wrap items-center gap-2 text-xs" style={{color: 'var(--text-tertiary)'}}>
+                    <span>80%+ item coverage</span>
+                    {compareSavings != null && compareSavings > 0 && (
+                      <span className="inline-flex items-center gap-2 rounded-full px-3 py-1" style={{backgroundColor: 'var(--accent-light)', color: 'var(--accent-primary)'}}>
+                        Save {formatCurrency(compareSavings, preferredCurrency)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
               <button
@@ -916,19 +935,7 @@ export default function MainDashboard() {
                 </svg>
               </button>
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm" style={{color: 'var(--text-secondary)'}}>
-              <span className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}>
-                Best value vs. your pick
-              </span>
-              <span style={{color: 'var(--text-tertiary)'}}>
-                A single-country total for all selected items.
-              </span>
-              {compareSavings != null && compareSavings > 0 && (
-                <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs" style={{backgroundColor: 'var(--accent-light)', color: 'var(--accent-primary)'}}>
-                  You could save {formatCurrency(compareSavings, preferredCurrency)}
-                </span>
-              )}
-            </div>
+            <div className="mt-3" />
           </div>
           <div
             id="totals-panel"
@@ -965,6 +972,11 @@ export default function MainDashboard() {
                         <p className="mt-1 text-lg sm:text-xl font-semibold" style={{color: 'var(--text-primary)'}}>
                           {effectiveBestMarket?.label ?? "Best market"}
                         </p>
+                        {effectiveBestMarket && totalItems > 0 && (
+                          <p className="text-xs" style={{color: 'var(--text-tertiary)'}}>
+                            Coverage: {effectiveBestMarket.count}/{totalItems} items
+                          </p>
+                        )}
                         <div className="mt-2 flex items-baseline gap-2">
                           <span className="text-2xl sm:text-3xl font-semibold" style={{color: 'var(--accent-primary)'}}>
                             {effectiveBestMarket?.total ? formatCurrency(effectiveBestMarket.total, preferredCurrency) : "Not available"}
@@ -1042,6 +1054,11 @@ export default function MainDashboard() {
                         <p className="text-sm sm:text-base font-medium" style={{color: 'var(--text-secondary)'}}>
                           See how close it gets to the best value
                         </p>
+                        {effectiveCompareMarket && totalItems > 0 && (
+                          <p className="text-xs" style={{color: 'var(--text-tertiary)'}}>
+                            Coverage: {effectiveCompareMarket.count}/{totalItems} items
+                          </p>
+                        )}
                       </div>
                       <select
                         value={effectiveCompareCode ?? ""}
@@ -1049,7 +1066,7 @@ export default function MainDashboard() {
                         className="rounded-md border px-2 py-1 text-xs sm:text-sm"
                         style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-secondary)'}}
                       >
-                        {itemsByCountry.map((entry) => (
+                        {marketList.map((entry) => (
                           <option key={entry.code} value={entry.code}>
                             {entry.label}
                           </option>

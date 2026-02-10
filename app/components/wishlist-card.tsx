@@ -614,7 +614,7 @@ export function WishlistCard({
                     <div className="relative">
                       <div
                         ref={leaderboardRef}
-                        className="max-h-[280px] overflow-y-auto pr-1 space-y-2"
+                        className="max-h-[280px] overflow-y-auto pr-1 pb-2 space-y-2"
                         onScroll={(e) => {
                           const el = e.currentTarget;
                           const noScroll = el.scrollHeight <= el.clientHeight + 1;

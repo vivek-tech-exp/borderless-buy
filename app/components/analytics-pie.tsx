@@ -61,13 +61,35 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
       homeValue: number | null;
     }>;
 
+  const itemColorPalette = [
+    "#3b82f6",
+    "#10b981",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#06b6d4",
+    "#ec4899",
+    "#14b8a6",
+    "#f97316",
+    "#6366f1",
+  ];
+
+  const getItemColor = (seed: string) => {
+    let hash = 5381;
+    for (let i = 0; i < seed.length; i += 1) {
+      hash = (hash * 33) ^ seed.charCodeAt(i);
+    }
+    const index = Math.abs(hash) % itemColorPalette.length;
+    return itemColorPalette[index];
+  };
+
   const data = productsData.map((p) => ({
     name: p.name,
     code: p.bestCountry,
     countryLabel: p.bestCountryLabel,
     buyLink: p.bestBuyingLink,
     value: p.bestValue,
-    fill: ITEM_CHART_COLORS[p.bestCountry as keyof typeof ITEM_CHART_COLORS] ?? "#333",
+    fill: getItemColor(p.id ?? p.name) ?? ITEM_CHART_COLORS[p.bestCountry as keyof typeof ITEM_CHART_COLORS] ?? "#333",
   }));
 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);

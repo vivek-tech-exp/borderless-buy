@@ -4,7 +4,7 @@ import { CurrencyProvider } from "@/app/lib/currency-context";
 import { ThemeProvider } from "@/app/lib/theme-context";
 
 export const metadata: Metadata = {
-  title: "Life Upgrade Manager - The Material Wishlist",
+  title: "One day, baby - The Material Wishlist",
   description:
     "Find the best deals worldwide. Compare prices across countries and save money on your dream purchases. Add items to your wishlist instantly.",
 };
