@@ -14,6 +14,21 @@ A smart shopping agent for Indian travelers that finds the cheapest country to b
 - **Intelligence:** Gemini 2.0 Flash (with Search Grounding)
 - **Database:** Supabase
 
+## Getting started
+```bash
+npm install
+npm run dev
+```
+
+## Docs
+- PRD and roadmap: docs/PRD.md
+- Tech setup: docs/TECH_SETUP.md
+- Project tour: docs/PROJECT_TOUR.md
+- Contributing: docs/CONTRIBUTING.md
+- Design system: docs/DESIGN_SYSTEM.md
+- Pricing engine: docs/PRICING_ENGINE_ARCHITECTURE.md
+- Security audit: docs/SECURITY_AUDIT.md
+
 ## Supabase persistence & auth
 
 This project includes Supabase for persisting wishlist items and a simple email "magic link" sign-in flow.
