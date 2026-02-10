@@ -595,7 +595,7 @@ export function WishlistCard({
                   className="absolute inset-0"
                   style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
                 >
-                  <div className="pt-4">
+                  <div className="flex h-full flex-col pt-4">
                     <div className="mb-3 flex items-center justify-between">
                       <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
                         Your market map
@@ -611,10 +611,13 @@ export function WishlistCard({
                         Back to summary
                       </button>
                     </div>
-                    <div className="relative">
+                    <div
+                      className="relative flex-1 min-h-0 rounded-xl border p-2"
+                      style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
+                    >
                       <div
                         ref={leaderboardRef}
-                        className="max-h-[280px] overflow-y-auto pr-1 pb-2 space-y-2"
+                        className="h-full overflow-y-auto pr-1 pb-2 space-y-2"
                         onScroll={(e) => {
                           const el = e.currentTarget;
                           const noScroll = el.scrollHeight <= el.clientHeight + 1;
@@ -640,7 +643,7 @@ export function WishlistCard({
 
                         const background = isBest
                           ? 'rgba(16,185,129,0.10)'
-                          : 'var(--bg-secondary)';
+                          : 'var(--bg-primary)';
                         const borderColor = isHome && !isBest
                           ? '#f59e0b'
                           : 'var(--border-primary)';
