@@ -251,7 +251,7 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
               }}
               onClick={(_, index, event) => {
                 setLockedIndex((prev) => (prev === index ? null : index));
-                setHoveredIndex(index);
+                setHoveredIndex((prev) => (prev === index ? null : index));
                 updatePanelPosition(event as any);
               }}
             >

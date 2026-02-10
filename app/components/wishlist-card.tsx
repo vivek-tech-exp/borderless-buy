@@ -193,7 +193,7 @@ export function WishlistCard({
           <div className="min-w-0 flex-1">
             <div className="relative group">
               <h3
-                className="text-lg font-semibold leading-snug truncate"
+                className="text-lg font-semibold leading-snug sm:truncate"
                 style={{color: 'var(--text-primary)'}}
               >
                 {product.displayName}
@@ -212,7 +212,7 @@ export function WishlistCard({
             <div className="flex items-center gap-2 mt-1">
               <div className="relative group min-w-0 flex-1">
                 <p
-                  className="text-[11px] truncate"
+                  className="text-[11px] sm:truncate"
                   style={{color: 'var(--text-tertiary)'}}
                 >
                   {product.name}
@@ -371,7 +371,7 @@ export function WishlistCard({
             {/* Hint to switch to global view */}
             {best && homeCountryData?.code !== best.code && (
               <div className="px-3 py-2 rounded-lg text-xs" style={{backgroundColor: 'var(--bg-secondary)', color: 'var(--text-tertiary)'}}>
-                💡 Switch to Global View to see cheaper options in other countries
+                💡 Switch to Global View to see better value options in other countries
               </div>
             )}
           </>
@@ -410,7 +410,7 @@ export function WishlistCard({
                         <div className="mt-2 grid grid-cols-2 gap-2">
                         <div className="rounded-lg border p-2.5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}>
                           <p className="text-[10px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                            Cheapest
+                            Best value
                           </p>
                           <p className="text-xs mt-1" style={{color: 'var(--text-secondary)'}}>
                             {best ? best.label : "—"}

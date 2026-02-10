@@ -884,7 +884,7 @@ export default function MainDashboard() {
             </button>
           </div>
           <p className="mb-4 text-xs" style={{color: 'var(--text-tertiary)'}}>
-            A single-country total for all selected items. Compare your market against the lowest total.
+            A single-country total for all selected items. Compare your market against the best value total.
           </p>
           <div
             id="totals-panel"
@@ -914,7 +914,7 @@ export default function MainDashboard() {
                   <div className="rounded-2xl border px-4 py-3" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                        Best total
+                        Best value total
                       </p>
                       <select
                         value={effectiveBestCode ?? ""}
@@ -959,8 +959,8 @@ export default function MainDashboard() {
                     </p>
                     <p className="text-[11px]" style={{color: 'var(--text-tertiary)'}}>
                       {compareSavings != null && compareSavings > 0
-                        ? `About ${formatCurrency(compareSavings, preferredCurrency)} above the best total`
-                        : "Aligned with the best total"}
+                        ? `About ${formatCurrency(compareSavings, preferredCurrency)} above the best value total`
+                        : "Aligned with the best value total"}
                     </p>
                   </div>
                 </div>
