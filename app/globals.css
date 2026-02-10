@@ -80,3 +80,8 @@ body {
   background-color: var(--bg-primary);
 }
 
+.recharts-wrapper:focus,
+.recharts-wrapper *:focus {
+  outline: none;
+}
+

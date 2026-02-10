@@ -20,12 +20,12 @@ import type { WishlistItem } from "@/types";
 
 const LOCAL_WISHLIST_KEY = "borderless-buy-guest-wishlist";
 const LOCAL_INCOME_KEY = "borderless-buy-income";
+const LOCAL_SELECTED_KEY = "borderless-buy-selected-items";
 
 export default function MainDashboard() {
   // Initialize with empty arrays to match SSR (prevents hydration errors)
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
   const [lastPrompt, setLastPrompt] = useState<string | null>(null);
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
@@ -51,6 +51,19 @@ export default function MainDashboard() {
     } catch (err) {
       console.warn("Failed to load wishlist from localStorage");
       localStorage.removeItem(LOCAL_WISHLIST_KEY);
+    }
+
+    try {
+      const storedSelected = localStorage.getItem(LOCAL_SELECTED_KEY);
+      if (storedSelected) {
+        const parsed = JSON.parse(storedSelected) as string[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSelectedIds(new Set(parsed));
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load selected items from localStorage");
+      localStorage.removeItem(LOCAL_SELECTED_KEY);
     }
     
     const savedIncome = localStorage.getItem(LOCAL_INCOME_KEY);
@@ -286,8 +299,6 @@ export default function MainDashboard() {
       next.delete(id);
       return next;
     });
-    if (hoveredItemId === id) setHoveredItemId(null);
-
     // If user is signed in, delete from server too
     if (user) {
       (async () => {
@@ -309,7 +320,7 @@ export default function MainDashboard() {
         }
       })();
     }
-  }, [hoveredItemId, user]);
+  }, [user]);
 
   const handleToggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -379,6 +390,13 @@ export default function MainDashboard() {
     }
   }, [items, user]);
 
+  useEffect(() => {
+    if (!hasLoadedFromStorage.current) return;
+    if (items.length === 0) return;
+    const currentIds = new Set(items.map((item) => item.id));
+    setSelectedIds((prev) => new Set(Array.from(prev).filter((id) => currentIds.has(id))));
+  }, [items]);
+
   // Persist income preference for guests
   useEffect(() => {
     if (user) return;
@@ -418,10 +436,39 @@ export default function MainDashboard() {
           setItems([]);
         }
       }
+
+      if (e.key === LOCAL_SELECTED_KEY) {
+        if (e.newValue) {
+          try {
+            const updatedSelected = JSON.parse(e.newValue) as string[];
+            if (Array.isArray(updatedSelected)) {
+              setSelectedIds(new Set(updatedSelected));
+            }
+          } catch {
+            console.warn("Failed to parse synced selected items");
+          }
+        } else {
+          setSelectedIds(new Set());
+        }
+      }
     };
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
   }, [user]);
+
+  useEffect(() => {
+    if (!hasLoadedFromStorage.current) return;
+    try {
+      const selectedArray = Array.from(selectedIds);
+      if (selectedArray.length > 0) {
+        localStorage.setItem(LOCAL_SELECTED_KEY, JSON.stringify(selectedArray));
+      } else {
+        localStorage.removeItem(LOCAL_SELECTED_KEY);
+      }
+    } catch {
+      // If storage fails, silently skip.
+    }
+  }, [selectedIds]);
 
   const availableTags = useMemo(() => {
     const tags = new Set<string>();
@@ -442,12 +489,6 @@ export default function MainDashboard() {
     }
   }, [availableTags, selectedTag]);
 
-  useEffect(() => {
-    if (!hoveredItemId) return;
-    const isVisible = displayItems.some((item) => item.id === hoveredItemId);
-    if (!isVisible) setHoveredItemId(null);
-  }, [displayItems, hoveredItemId]);
-
   const selectAll = useCallback(() => {
     setSelectedIds(new Set(displayItems.map((i) => i.id)));
   }, [displayItems]);
@@ -458,10 +499,7 @@ export default function MainDashboard() {
 
   const selectedItems = displayItems.filter((i) => selectedIds.has(i.id));
   const itemsForTotals = selectedTag ? displayItems : selectedItems;
-  const chartItems =
-    hoveredItemId != null
-      ? displayItems.filter((i) => i.id === hoveredItemId)
-      : itemsForTotals;
+  const chartItems = itemsForTotals;
 
   const totalsByCountry = COUNTRY_CODES.map((code) => {
     const total = itemsForTotals.reduce((sum, item) => {
@@ -475,7 +513,13 @@ export default function MainDashboard() {
     (min, t) => (t.total > 0 && (min === 0 || t.total < min) ? t.total : min),
     0
   );
-  const showTotals = itemsForTotals.length > 0 && !hoveredItemId;
+  const bestMarket = totalsByCountry.reduce(
+    (best, t) => (t.total > 0 && (!best || t.total < best.total) ? t : best),
+    null as { code: string; label: string; total: number } | null
+  );
+  const homeTotal = totalsByCountry.find((t) => t.code === preferredCountry)?.total ?? 0;
+  const potentialSavings = bestTotal > 0 && homeTotal > 0 ? homeTotal - bestTotal : null;
+  const showTotals = itemsForTotals.length > 0;
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
@@ -742,9 +786,6 @@ export default function MainDashboard() {
                   selected={selectedIds.has(item.id)}
                   onToggleSelect={handleToggleSelect}
                   onRemove={handleRemove}
-                  onMouseEnter={() => setHoveredItemId(item.id)}
-                  onMouseLeave={() => setHoveredItemId(null)}
-                  isHovered={hoveredItemId === item.id}
                   viewMode={viewMode}
                   incomeAmount={safeIncomeAmount}
                   onIncomeFocus={handleIncomeFocus}
@@ -762,7 +803,7 @@ export default function MainDashboard() {
           <ChartPieIcon className="h-4 w-4" style={{color: 'var(--accent-primary)'}} />
           Price Comparison Across Markets
         </h2>
-        <AnalyticsPie items={chartItems} hoveredItemId={hoveredItemId} />
+        <AnalyticsPie items={chartItems} />
       </section>
 
       {showTotals && (
@@ -770,7 +811,7 @@ export default function MainDashboard() {
           <div className="mb-6 flex items-center justify-between gap-3">
             <h2 className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
               <CurrencyDollarIcon className="h-4 w-4" style={{color: 'var(--accent-primary)'}} />
-              Total Acquisition Cost
+              Total if bought in one market
             </h2>
             <button
               type="button"
@@ -782,6 +823,9 @@ export default function MainDashboard() {
               {totalsExpanded ? "Hide" : "Show"}
             </button>
           </div>
+          <p className="mb-4 text-xs" style={{color: 'var(--text-tertiary)'}}>
+            A single-country total for all selected items. Compare your market against the best overall.
+          </p>
           <div
             id="totals-panel"
             className={`${totalsExpanded ? "block" : "hidden"} sm:block transition-all duration-200`}
@@ -806,39 +850,32 @@ export default function MainDashboard() {
             ) : (
               /* Global Mode - Show all countries */
               <>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                  {totalsByCountry.map(({ code, label, total }) => (
-                    <div
-                      key={code}
-                      className="rounded-xl border px-3 py-3 min-h-[100px] flex flex-col justify-between"
-                      style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}
-                    >
-                      <div className="min-w-0">
-                        <span
-                          className="mb-1 block h-1.5 w-1.5 rounded-full"
-                          style={{ backgroundColor: ITEM_CHART_COLORS[code] }}
-                          aria-hidden
-                        />
-                        <p className="text-[10px] font-medium uppercase tracking-wider truncate" style={{color: 'var(--text-tertiary)'}}>
-                          {label}
-                        </p>
-                      </div>
-                      <p className="mt-2 text-base font-semibold tabular-nums break-words" style={{color: 'var(--text-primary)'}}>
-                        {total > 0
-                          ? formatCurrency(total, preferredCurrency)
-                          : "—"}
-                      </p>
-                    </div>
-                  ))}
+                <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border px-4 py-3" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+                    <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                      Best total
+                    </p>
+                    <p className="mt-1 text-lg font-semibold" style={{color: 'var(--accent-primary)'}}>
+                      {bestMarket?.total ? formatCurrency(bestMarket.total, preferredCurrency) : "—"}
+                    </p>
+                    <p className="text-[11px]" style={{color: 'var(--text-tertiary)'}}>
+                      {bestMarket?.label ? `${bestMarket.label} is lowest overall` : "No totals available"}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border px-4 py-3" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+                    <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                      Your market
+                    </p>
+                    <p className="mt-1 text-lg font-semibold" style={{color: 'var(--text-primary)'}}>
+                      {homeTotal > 0 ? formatCurrency(homeTotal, preferredCurrency) : "—"}
+                    </p>
+                    <p className="text-[11px]" style={{color: 'var(--text-tertiary)'}}>
+                      {potentialSavings != null && potentialSavings > 0
+                        ? `About ${formatCurrency(potentialSavings, preferredCurrency)} above the best total`
+                        : "Aligned with the best total"}
+                    </p>
+                  </div>
                 </div>
-                {bestTotal > 0 && (
-                  <p className="mt-4 text-sm text-[var(--text-secondary)]">
-                    💰 Cost to Satisfy:{" "}
-                    <span className="font-medium" style={{color: 'var(--accent-primary)'}}>
-                      {formatCurrency(bestTotal, preferredCurrency)}
-                    </span>
-                  </p>
-                )}
               </>
             )}
           </div>
