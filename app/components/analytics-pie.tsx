@@ -5,7 +5,6 @@ import {
   Pie,
   Cell,
   ResponsiveContainer,
-  Legend,
   Sector,
 } from "recharts";
 import type { SectorProps } from "recharts";
@@ -115,27 +114,6 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
   const optimizedTotal = productsData.reduce((s, p) => s + p.bestValue, 0);
   const homeTotal = productsData.reduce((s, p) => s + (p.homeValue ?? p.bestValue), 0);
 
-  const renderLegend = (props: { payload?: Array<{ value?: string; color?: string }> }) => {
-    const { payload } = props;
-    if (!payload || payload.length === 0) return null;
-    return (
-      <ul className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs sm:text-sm leading-snug" style={{ color: 'var(--text-secondary)' }}>
-        {payload.map((entry) => (
-          <li key={entry.value ?? "legend"} className="flex items-center gap-2">
-            <span
-              className="h-2.5 w-2.5 rounded-sm"
-              style={{ backgroundColor: entry.color }}
-              aria-hidden
-            />
-            <span className="max-w-[240px] break-words">
-              {String(entry.value)}
-            </span>
-          </li>
-        ))}
-      </ul>
-    );
-  };
-
   if (data.length === 0) {
     return (
       <div className="flex h-[260px] items-center justify-center rounded-xl border text-sm" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)', color: 'var(--text-tertiary)'}}>
@@ -158,7 +136,7 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
       </div>
 
       <div
-        className="relative h-[300px] w-full"
+        className="relative h-[320px] w-full py-2"
         ref={chartRef}
         style={{ outline: "none" }}
         onMouseDown={(e) => e.preventDefault()}
@@ -241,7 +219,7 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
         )}
         <div className="relative z-0 h-full">
           <ResponsiveContainer width="100%" height="100%">
-            <PieChart tabIndex={-1} style={{ outline: "none" }}>
+            <PieChart tabIndex={-1} style={{ outline: "none" }} margin={{ top: 8, bottom: 8 }}>
             <Pie
               data={data}
               cx="50%"
@@ -280,10 +258,23 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
                 <Cell key={entry.name} fill={entry.fill} />
               ))}
               </Pie>
-              <Legend content={renderLegend} />
             </PieChart>
           </ResponsiveContainer>
         </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
+        {data.map((entry) => (
+          <span key={entry.name} className="inline-flex items-center gap-2">
+            <span
+              className="h-2.5 w-2.5 rounded-sm"
+              style={{ backgroundColor: entry.fill }}
+              aria-hidden
+            />
+            <span className="max-w-[220px] truncate">
+              {entry.name}
+            </span>
+          </span>
+        ))}
       </div>
     </div>
   );

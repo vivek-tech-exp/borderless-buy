@@ -598,7 +598,7 @@ export function WishlistCard({
                   <div className="pt-4">
                     <div className="mb-3 flex items-center justify-between">
                       <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                        The leaderboard
+                        Your market map
                       </p>
                       <button
                         type="button"
