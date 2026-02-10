@@ -108,7 +108,7 @@ export function WishlistCard({
     ? effectivePrice / incomeAmount
     : null;
   const incomeRatioLabel = incomeRatio
-    ? `${incomeRatio.toFixed(1)}x your monthly income`
+    ? `${incomeRatio.toFixed(2)}x your monthly income`
     : null;
 
   const homeRow = pricesByCountry.find((row) => row.code === preferredCountry);
@@ -388,7 +388,7 @@ export function WishlistCard({
                           )}
                           {bestRatio && (
                             <p className="text-[10px] mt-0.5" style={{color: 'var(--text-tertiary)'}}>
-                              {bestRatio.toFixed(1)}x income
+                              {bestRatio.toFixed(2)}x income
                             </p>
                           )}
                         </div>
@@ -417,7 +417,7 @@ export function WishlistCard({
                           )}
                           {homeRatio && (
                             <p className="text-[10px] mt-0.5" style={{color: 'var(--text-tertiary)'}}>
-                              {homeRatio.toFixed(1)}x income
+                              {homeRatio.toFixed(2)}x income
                             </p>
                           )}
                         </div>
@@ -586,7 +586,7 @@ export function WishlistCard({
                                   )}
                                   {showIncome && hasPrice && (
                                     <span>
-                                      {(row.convertedPrice / (incomeAmount as number)).toFixed(1)}x income
+                                      {(row.convertedPrice / (incomeAmount as number)).toFixed(2)}x income
                                     </span>
                                   )}
                                 </div>

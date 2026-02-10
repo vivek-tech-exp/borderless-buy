@@ -15,46 +15,40 @@ export function ViewModeToggle({ mode, onToggle, countryLabel }: ViewModeToggleP
 
   return (
     <div className="flex items-center justify-center sm:justify-start">
-      <button
-        type="button"
-        onClick={() => onToggle(isGlobal ? "local" : "global")}
-        className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl border transition-all duration-200"
-        style={{
-          backgroundColor: isGlobal ? 'var(--bg-secondary)' : 'var(--bg-secondary)',
-          borderColor: isGlobal ? 'var(--accent-primary)' : 'var(--border-primary)',
-          color: isGlobal ? 'var(--accent-primary)' : 'var(--text-secondary)',
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.borderColor = 'var(--accent-primary)';
-          e.currentTarget.style.color = 'var(--accent-primary)';
-        }}
-        onMouseLeave={(e) => {
-          if (isGlobal) {
-            e.currentTarget.style.borderColor = 'var(--accent-primary)';
-            e.currentTarget.style.color = 'var(--accent-primary)';
-          } else {
-            e.currentTarget.style.borderColor = 'var(--border-primary)';
-            e.currentTarget.style.color = 'var(--text-secondary)';
-          }
-        }}
-        title={isGlobal ? "Switch to local prices only" : "Switch to global comparison"}
+      <div
+        className="inline-flex items-center rounded-full border p-1"
+        style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}
+        aria-label="Pricing view"
       >
-        {isGlobal ? (
-          <>
-            <GlobeAltIcon className="w-4 h-4" />
-            <span className="text-sm font-medium">Global View</span>
-          </>
-        ) : (
-          <>
-            <HomeIcon className="w-4 h-4" />
-            <span className="text-sm font-medium">{countryLabel} Only</span>
-          </>
-        )}
-        <span className="text-xs opacity-70">•</span>
-        <span className="text-xs opacity-70">
-          {isGlobal ? `Tap for ${countryLabel} view` : "Tap for Global view"}
-        </span>
-      </button>
+        <button
+          type="button"
+          onClick={() => onToggle("global")}
+          className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
+          style={{
+            backgroundColor: isGlobal ? 'var(--accent-primary)' : 'transparent',
+            color: isGlobal ? 'white' : 'var(--text-secondary)',
+            boxShadow: isGlobal ? '0 6px 16px rgba(0,0,0,0.15)' : 'none',
+          }}
+          title="Compare worldwide prices"
+        >
+          <GlobeAltIcon className="h-4 w-4" />
+          Global
+        </button>
+        <button
+          type="button"
+          onClick={() => onToggle("local")}
+          className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
+          style={{
+            backgroundColor: !isGlobal ? 'var(--accent-primary)' : 'transparent',
+            color: !isGlobal ? 'white' : 'var(--text-secondary)',
+            boxShadow: !isGlobal ? '0 6px 16px rgba(0,0,0,0.15)' : 'none',
+          }}
+          title={`Show ${countryLabel} prices only`}
+        >
+          <HomeIcon className="h-4 w-4" />
+          {countryLabel}
+        </button>
+      </div>
     </div>
   );
 }

@@ -586,16 +586,27 @@ export default function MainDashboard() {
       </section>
 
       {items.length > 0 && (
-        <section className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <ViewModeToggle 
-            mode={viewMode} 
-            onToggle={handleViewModeChange}
-            countryLabel={COUNTRY_LABELS[preferredCountry]}
-          />
-          <div className="flex flex-col gap-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
+        <section className="mb-8">
+          <div
+            className="grid gap-4 rounded-2xl border px-4 py-3 sm:grid-cols-[1fr,auto] sm:items-center"
+            style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)' }}
+          >
+            <div className="flex flex-col gap-2">
+              <div className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>
+                Pricing view
+              </div>
+              <ViewModeToggle
+                mode={viewMode}
+                onToggle={handleViewModeChange}
+                countryLabel={COUNTRY_LABELS[preferredCountry]}
+              />
+              <div className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                Compare global prices or focus on your home market.
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 sm:items-end">
               <label className="flex flex-col gap-1">
-                <span className="text-xs" style={{color: 'var(--text-tertiary)'}}>
+                <span className="text-[11px] uppercase tracking-wider" style={{ color: 'var(--text-tertiary)' }}>
                   Monthly income ({preferredCurrency})
                 </span>
                 <Input
@@ -611,18 +622,18 @@ export default function MainDashboard() {
                   aria-label="Monthly income"
                 />
               </label>
+              <span className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                Private on this device only. Not sent to servers.{" "}
+                <a
+                  href="/docs/SECURITY_AUDIT.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline hover:opacity-75 transition-opacity"
+                >
+                  Learn more
+                </a>
+              </span>
             </div>
-            <span className="text-[11px]" style={{color: 'var(--text-tertiary)'}}>
-              🔒 Your income stays private: stored locally on this device only. Not sent to servers. Not visible to anyone.{" "}
-              <a 
-                href="/docs/SECURITY_AUDIT.md" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="underline hover:opacity-75 transition-opacity"
-              >
-                Learn more
-              </a>
-            </span>
           </div>
         </section>
       )}
