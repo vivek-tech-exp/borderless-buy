@@ -651,7 +651,7 @@ export function WishlistCard({
                             className="rounded-lg border px-3 py-1.5"
                             style={{backgroundColor: background, borderColor}}
                           >
-                            <div className="grid grid-cols-[24px_1fr_auto] items-center gap-2">
+                            <div className="grid grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2">
                               <div className="text-xs font-medium" style={{color: 'var(--text-tertiary)'}}>
                                 {index + 1}.
                               </div>
@@ -671,17 +671,19 @@ export function WishlistCard({
                                     </span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2 text-xs" style={{color: 'var(--text-tertiary)'}}>
-                                  <span>
-                                    {hasPrice
-                                      ? formatCurrency(row.convertedPrice!, preferredCurrency, { maxFractionDigits: 0 })
-                                      : "Not available"}
-                                  </span>
-                                  {diff != null && diff > 0 && (
+                                <div className="flex flex-col gap-0.5 text-xs" style={{color: 'var(--text-tertiary)'}}>
+                                  <div className="flex items-center gap-2">
                                     <span>
-                                      +{formatCurrency(diff, preferredCurrency, { maxFractionDigits: 0 })}
+                                      {hasPrice
+                                        ? formatCurrency(row.convertedPrice!, preferredCurrency, { maxFractionDigits: 0 })
+                                        : "Not available"}
                                     </span>
-                                  )}
+                                    {diff != null && diff > 0 && (
+                                      <span>
+                                        +{formatCurrency(diff, preferredCurrency, { maxFractionDigits: 0 })}
+                                      </span>
+                                    )}
+                                  </div>
                                   {showIncome && hasPrice && (
                                     <span>
                                       {(row.convertedPrice / (incomeAmount as number)).toFixed(2)}x income
@@ -689,25 +691,25 @@ export function WishlistCard({
                                   )}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                {row.priceSource && (
-                                    <span className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                                      {normalizePriceSource(row.priceSource)}
-                                  </span>
-                                )}
-                                {row.buyingLink && (
+                              <div className="flex min-w-[88px] flex-col items-end gap-1 text-right">
+                                {row.buyingLink ? (
                                   <a
                                     href={row.buyingLink}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-xs"
+                                    className="inline-flex max-w-[140px] items-center gap-1 text-xs"
                                     style={{color: 'var(--accent-primary)'}}
                                     onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
                                     onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
                                   >
-                                    Buy ↗
+                                    <span className="truncate">{normalizePriceSource(row.priceSource)}</span>
+                                    <span aria-hidden>↗</span>
                                   </a>
-                                )}
+                                ) : row.priceSource ? (
+                                  <span className="max-w-[140px] truncate text-xs" style={{color: 'var(--text-tertiary)'}}>
+                                    {normalizePriceSource(row.priceSource)}
+                                  </span>
+                                ) : null}
                               </div>
                             </div>
                           </div>
