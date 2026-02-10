@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircleIcon, XCircleIcon, ClockIcon, LightBulbIcon, TrashIcon } from "@heroicons/react/24/outline";
-import type { WishlistItem, CountryCode } from "@/types";
+import type { WishlistItem } from "@/types";
 import { COUNTRY_CODES, COUNTRY_LABELS } from "@/types";
 import { useCurrency } from "@/app/lib/currency-context";
 import { formatCurrency } from "@/app/lib/utils";
@@ -41,15 +41,22 @@ export function WishlistCard({
   onUpdateTag,
   availableTags = [],
 }: WishlistCardProps) {
-  const [showDetails, setShowDetails] = useState(false);
+  const [isFlipped, setIsFlipped] = useState(false);
   const [isEditingTag, setIsEditingTag] = useState(false);
   const [tagInput, setTagInput] = useState(item.tag ?? "");
+  const [showRationale, setShowRationale] = useState(false);
   const { convertToPreferred, preferredCurrency, preferredCountry, rates } = useCurrency();
   const { product } = item;
 
   useEffect(() => {
     setTagInput(item.tag ?? "");
   }, [item.tag]);
+
+  useEffect(() => {
+    if (!product.isVagueQuery) {
+      setShowRationale(false);
+    }
+  }, [product.isVagueQuery]);
 
   const pricesByCountry = COUNTRY_CODES.map((code) => {
     const p = product.pricing[code];
@@ -92,8 +99,7 @@ export function WishlistCard({
     ? withConverted.reduce((a, b) => (a.convertedPrice <= b.convertedPrice ? a : b))
     : null;
 
-  // Get home country price for local mode
-  const homeCountryData = pricesByCountry.find(r => r.code === preferredCountry);
+  const homeCountryData = pricesByCountry.find((row) => row.code === preferredCountry);
   const hasHomePrice = homeCountryData?.convertedValid && homeCountryData.convertedPrice != null;
 
   const effectivePrice = viewMode === "local"
@@ -105,6 +111,17 @@ export function WishlistCard({
   const incomeRatioLabel = incomeRatio
     ? `${incomeRatio.toFixed(1)}x your monthly income`
     : null;
+
+  const homeRow = pricesByCountry.find((row) => row.code === preferredCountry);
+  const topMarkets = withConverted
+    .slice()
+    .sort((a, b) => a.convertedPrice - b.convertedPrice)
+    .slice(0, 3);
+  const flipMarkets = [homeRow, ...withConverted.filter((row) => row.code !== preferredCountry)]
+    .filter(Boolean) as typeof pricesByCountry;
+  const flipMarketsTop = flipMarkets
+    .filter((row, index, arr) => arr.findIndex((r) => r.code === row.code) === index)
+    .slice(0, 9);
 
   const commitTag = () => {
     if (!onUpdateTag) {
@@ -143,16 +160,40 @@ export function WishlistCard({
             <h3 className="text-lg font-semibold leading-snug" style={{color: 'var(--text-primary)'}}>
               {product.displayName}
             </h3>
-            <div className="flex items-center gap-2 mt-1.5">
+            <div className="flex items-center justify-between gap-2 mt-1.5">
               <p className="text-xs" style={{color: 'var(--text-tertiary)'}}>{product.name}</p>
-              <span className="inline-block px-2 py-0.5 text-xs rounded-full" style={{backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)'}}>
-                {product.carryOnFriendly ? "🌍 Global Asset" : "🏠 Local Purchase"}
+              <span
+                className="shrink-0 rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-wider"
+                style={{backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', borderColor: 'var(--border-primary)'}}
+                title={product.carryOnFriendly ? "Easy to buy abroad and carry home" : "Best purchased locally"}
+              >
+                {product.carryOnFriendly ? "Global buy" : "Local buy"}
               </span>
             </div>
             {product.isVagueQuery && product.selectionRationale && (
-              <p className="text-xs mt-1" style={{color: 'var(--text-tertiary)'}}>
-                Picked: {product.selectionRationale}
-              </p>
+              <div className="mt-1">
+                <button
+                  type="button"
+                  className="text-xs underline decoration-dotted transition-colors"
+                  style={{color: 'var(--text-tertiary)'}}
+                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
+                  onClick={() => setShowRationale((prev) => !prev)}
+                  aria-expanded={showRationale}
+                  aria-controls={`rationale-${item.id}`}
+                >
+                  Why this pick?
+                </button>
+                {showRationale && (
+                  <div
+                    id={`rationale-${item.id}`}
+                    className="mt-2 rounded-lg border p-3 text-xs"
+                    style={{backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', color: 'var(--text-secondary)'}}
+                  >
+                    {product.selectionRationale}
+                  </div>
+                )}
+              </div>
             )}
             <div className="flex flex-wrap items-center gap-2 mt-2">
               {!isEditingTag && item.tag && (
@@ -256,7 +297,10 @@ export function WishlistCard({
                     </span>
                   </div>
                   {incomeRatioLabel ? (
-                    <div className="flex items-center gap-1.5 text-xs" style={{color: 'var(--text-tertiary)'}}>
+                    <div
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium"
+                      style={{borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)', backgroundColor: 'var(--bg-secondary)'}}
+                    >
                       <ClockIcon className="h-3.5 w-3.5" />
                       <span>About {incomeRatioLabel}</span>
                     </div>
@@ -303,176 +347,174 @@ export function WishlistCard({
         ) : (
           /* Global Mode View */
           <>
-            {/* Best Price Highlight */}
-            {best && (
-              <div className="mb-5 p-4 rounded-xl border" style={{backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--accent-primary)', opacity: 0.8}}>
-                <p className="text-xs uppercase tracking-wide font-medium mb-1" style={{color: 'var(--text-secondary)'}}>
-                  💰 Best Available Price
-                </p>
-                <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-bold" style={{color: 'var(--accent-primary)'}}>
-                    {formatCurrency(best.convertedPrice, preferredCurrency, { maxFractionDigits: 0 })}
-                  </span>
-                  <span className="text-sm" style={{color: 'var(--text-secondary)'}}>
-                    in {best.label}
-                  </span>
-                </div>
-                {incomeRatioLabel ? (
-                  <div className="flex items-center gap-1.5 text-xs mt-2" style={{color: 'var(--text-tertiary)'}}>
-                    <ClockIcon className="h-3.5 w-3.5" />
-                    <span>About {incomeRatioLabel}</span>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="text-xs mt-2 transition-colors"
-                    style={{color: 'var(--accent-primary)'}}
-                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
-                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
-                    onClick={onIncomeFocus}
-                  >
-                    Add income to see affordability
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Country Grid */}
-            <div className="grid grid-cols-3 gap-2 mb-4">
-          {pricesByCountry.map((row) => {
-            const isBest = best?.code === row.code;
-            const color = ITEM_CHART_COLORS[row.code];
-            const hasPrice = row.convertedValid && row.convertedPrice != null;
-
-            return (
+            <div style={{ perspective: '1200px' }}>
               <div
-                key={row.code}
-                className="p-3 rounded-lg border transition-all"
+                className="relative"
                 style={{
-                  backgroundColor: isBest ? 'var(--bg-secondary)' : 'var(--bg-secondary)',
-                  borderColor: isBest ? 'var(--accent-primary)' : 'var(--border-primary)',
-                  opacity: isBest ? 0.9 : 1,
+                  transformStyle: 'preserve-3d',
+                  transition: 'transform 500ms ease',
+                  transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
                 }}
               >
-                <div className="flex items-center gap-1.5 mb-2">
-                  <span
-                    className="h-2 w-2 rounded-full shrink-0"
-                    style={{ backgroundColor: color }}
-                    aria-hidden
-                  />
-                  <span className="text-xs font-medium truncate" style={{color: 'var(--text-secondary)'}}>
-                    {row.label}
-                  </span>
-                </div>
-                <p className="text-sm font-semibold tabular-nums" style={{color: hasPrice ? 'var(--text-primary)' : 'var(--text-tertiary)'}}>
-                  {hasPrice
-                    ? formatCurrency(row.convertedPrice!, preferredCurrency, { maxFractionDigits: 0 })
-                    : "Not available"}
-                </p>
-                {row.stockStatus && row.stockStatus !== "unknown" && (
-                  <p className="text-[10px] mt-1" style={{color: 'var(--text-tertiary)'}}>
-                    {row.stockStatus === "in_stock" && "✓ In stock"}
-                    {row.stockStatus === "out_of_stock" && "✗ Out of stock"}
-                    {row.stockStatus === "preorder" && "⏳ Preorder"}
-                  </p>
-                )}
-                {row.buyingLink && hasPrice && (
-                  <a
-                    href={row.buyingLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] transition-colors mt-1.5 inline-block"
-                    style={{color: 'var(--accent-primary)'}}
-                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
-                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
-
-                  >
-                    Shop →
-                  </a>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Details Toggle */}
-        <button
-          type="button"
-          onClick={() => setShowDetails(!showDetails)}
-          className="w-full text-xs transition-colors py-2 text-center border-t mt-2 -mx-4 -mb-4 px-4"
-          style={{borderColor: 'var(--border-primary)', color: 'var(--text-tertiary)'}}
-          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
-        >
-          {showDetails ? "Hide details" : "View all prices & sources"}
-        </button>
-
-        {/* Expanded Details */}
-        {showDetails && (
-          <div className="mt-4 pt-4 border-t border-zinc-800/50 space-y-3">
-            {pricesByCountry.map((row) => {
-              const color = ITEM_CHART_COLORS[row.code];
-              return (
-                <div key={row.code} className="text-sm">
-                  <div className="flex items-start gap-2">
-                    <span
-                      className="h-2 w-2 rounded-full shrink-0 mt-1"
-                      style={{ backgroundColor: color }}
-                      aria-hidden
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-zinc-300">{row.label}</p>
-                      <p className="text-xs text-zinc-500 mt-0.5">
-                        {row.originalPrice
-                          ? formatCurrency(row.originalPrice, row.originalCurrency!)
-                          : "Not available"}
-                        {row.priceSource && ` • ${row.priceSource}`}
+                {/* Front */}
+                <div style={{ backfaceVisibility: 'hidden' }}>
+                  {/* Best Price Highlight */}
+                  {best && (
+                    <div
+                      className="mb-5 p-4 rounded-xl border"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(16,185,129,0.02))',
+                        borderColor: 'var(--accent-primary)',
+                        boxShadow: '0 10px 30px rgba(16, 185, 129, 0.12)',
+                      }}
+                    >
+                      <p className="text-xs uppercase tracking-wide font-medium mb-1" style={{color: 'var(--text-secondary)'}}>
+                        💰 Best Available Price
                       </p>
-                      {row.stockStatus && row.stockStatus !== "unknown" && (
-                        <div className="flex items-center gap-2 mt-1 text-xs">
-                          {row.stockStatus === "in_stock" && (
-                            <>
-                              <CheckCircleIcon className="h-3.5 w-3.5 text-emerald-600 flex-shrink-0" />
-                              <span className="text-zinc-500">In stock</span>
-                            </>
-                          )}
-                          {row.stockStatus === "out_of_stock" && (
-                            <>
-                              <XCircleIcon className="h-3.5 w-3.5 text-red-600 flex-shrink-0" />
-                              <span className="text-zinc-500">Out of stock</span>
-                            </>
-                          )}
-                          {row.stockStatus === "preorder" && (
-                            <>
-                              <ClockIcon className="h-3.5 w-3.5 text-amber-600 flex-shrink-0" />
-                              <span className="text-zinc-500">Preorder</span>
-                            </>
-                          )}
-                        </div>
-                      )}
-                      {row.notes && (
-                        <div className="flex items-start gap-2 mt-2">
-                          <LightBulbIcon className="h-3.5 w-3.5 mt-0.5 text-amber-600 flex-shrink-0" />
-                          <p className="text-xs text-amber-600">{row.notes}</p>
-                        </div>
-                      )}
-                      {row.buyingLink && (
-                        <a
-                          href={row.buyingLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-emerald-500 hover:text-emerald-400 mt-1.5 inline-block"
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-bold" style={{color: 'var(--accent-primary)'}}>
+                          {formatCurrency(best.convertedPrice, preferredCurrency, { maxFractionDigits: 0 })}
+                        </span>
+                        <span className="text-sm" style={{color: 'var(--text-secondary)'}}>
+                          in {best.label}
+                        </span>
+                      </div>
+                      {incomeRatioLabel ? (
+                        <div
+                          className="mt-2 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium"
+                          style={{borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)', backgroundColor: 'var(--bg-secondary)'}}
                         >
-                          View on retailer →
-                        </a>
+                          <ClockIcon className="h-3.5 w-3.5" />
+                          <span>About {incomeRatioLabel}</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="text-xs mt-2 transition-colors"
+                          style={{color: 'var(--accent-primary)'}}
+                          onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+                          onClick={onIncomeFocus}
+                        >
+                          Add income to see affordability
+                        </button>
                       )}
+                    </div>
+                  )}
+
+                  {topMarkets.length > 0 && (
+                    <div className="mb-4 rounded-xl border p-3" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+                      <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                        Top markets
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {topMarkets.map((row) => (
+                          <div key={row.code} className="rounded-full border px-3 py-1 text-xs" style={{borderColor: 'var(--border-primary)', color: 'var(--text-secondary)'}}>
+                            {row.label} · {formatCurrency(row.convertedPrice, preferredCurrency, { maxFractionDigits: 0 })}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => setIsFlipped(true)}
+                    className="w-full text-xs transition-colors py-2 text-center border-t mt-2 -mx-4 -mb-4 px-4"
+                    style={{borderColor: 'var(--border-primary)', color: 'var(--text-tertiary)'}}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
+                  >
+                    See all markets
+                  </button>
+                </div>
+
+                {/* Back */}
+                <div
+                  className="absolute inset-0"
+                  style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+                >
+                  <div className="pt-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                        All markets (top 9)
+                      </p>
+                      <button
+                        type="button"
+                        className="text-xs transition-colors"
+                        style={{color: 'var(--text-tertiary)'}}
+                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
+                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
+                        onClick={() => setIsFlipped(false)}
+                      >
+                        Back
+                      </button>
+                    </div>
+                    <div className="max-h-[360px] overflow-y-auto pr-1">
+                      <div className="grid grid-cols-3 gap-2">
+                      {flipMarketsTop.map((row) => {
+                        const color = ITEM_CHART_COLORS[row.code];
+                        const hasPrice = row.convertedValid && row.convertedPrice != null;
+                        const ratio = incomeAmount && incomeAmount > 0 && row.convertedPrice
+                          ? row.convertedPrice / incomeAmount
+                          : null;
+
+                        return (
+                          <div
+                            key={row.code}
+                            className="rounded-lg border p-3"
+                            style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-1.5">
+                                <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: color }} aria-hidden />
+                                <span className="text-xs font-medium" style={{color: 'var(--text-secondary)'}}>
+                                  {row.label}
+                                </span>
+                              </div>
+                              {row.code === preferredCountry && (
+                                <span className="text-[10px] uppercase tracking-wider" style={{color: 'var(--accent-primary)'}}>
+                                  Home
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm font-semibold tabular-nums" style={{color: hasPrice ? 'var(--text-primary)' : 'var(--text-tertiary)'}}>
+                              {hasPrice
+                                ? formatCurrency(row.convertedPrice!, preferredCurrency, { maxFractionDigits: 0 })
+                                : "Not available"}
+                            </p>
+                            {ratio && (
+                              <p className="text-[10px] mt-1" style={{color: 'var(--text-tertiary)'}}>
+                                {ratio.toFixed(1)}x monthly
+                              </p>
+                            )}
+                            {row.priceSource && (
+                              <p className="text-[10px] mt-1 uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                                {row.priceSource}
+                              </p>
+                            )}
+                            {row.buyingLink && (
+                              <a
+                                href={row.buyingLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-[11px] mt-1.5 inline-block"
+                                style={{color: 'var(--accent-primary)'}}
+                                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+                              >
+                                View on retailer →
+                              </a>
+                            )}
+                          </div>
+                        );
+                      })}
+                      </div>
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              </div>
+            </div>
           </>
         )}
       </CardContent>
