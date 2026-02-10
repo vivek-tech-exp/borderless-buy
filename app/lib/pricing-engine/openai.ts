@@ -18,7 +18,7 @@ export class OpenAIPricingEngine extends BasePricingEngine {
 
   async resolveProductPricing(
     query: string
-  ): Promise<{ product: Product; prompt: string } | null> {
+  ): Promise<{ product: Product; prompt: string } | { error: string; prompt: string } | null> {
     this.error("OpenAI engine not yet implemented. Please use Gemini or Perplexity.");
     return null;
     

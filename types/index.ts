@@ -73,6 +73,8 @@ export interface Product {
   category: "tech" | "vehicle" | "other";
   carryOnFriendly: boolean;
   baselineConfiguration?: string;
+  isVagueQuery?: boolean;
+  selectionRationale?: string;
   /** Pricing by country code; may be partial if not available */
   pricing: Partial<Record<CountryCode, CountryPricing>>;
 }

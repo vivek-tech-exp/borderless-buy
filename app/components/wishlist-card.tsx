@@ -149,6 +149,11 @@ export function WishlistCard({
                 {product.carryOnFriendly ? "🌍 Global Asset" : "🏠 Local Purchase"}
               </span>
             </div>
+            {product.isVagueQuery && product.selectionRationale && (
+              <p className="text-xs mt-1" style={{color: 'var(--text-tertiary)'}}>
+                Picked: {product.selectionRationale}
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-2 mt-2">
               {!isEditingTag && item.tag && (
                 <button

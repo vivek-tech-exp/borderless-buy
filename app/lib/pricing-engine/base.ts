@@ -5,16 +5,23 @@ import { createLogger, type Logger } from "@/app/lib/logger";
  * Base interface for pricing engines.
  * Implementations define how to fetch and validate pricing data from various LLM providers.
  */
+export type PricingResult =
+  | {
+      product: Product;
+      prompt: string;
+    }
+  | {
+      error: string;
+      prompt: string;
+    };
+
 export interface PricingEngine {
   /**
    * Resolve a product query and return pricing across all supported countries.
    * @param query - Product name or description (e.g., "MacBook Pro 14")
    * @returns Product with pricing data and the prompt used for transparency
    */
-  resolveProductPricing(query: string): Promise<{
-    product: Product;
-    prompt: string;
-  } | null>;
+  resolveProductPricing(query: string): Promise<PricingResult | null>;
 }
 
 /**
@@ -27,10 +34,7 @@ export abstract class BasePricingEngine implements PricingEngine {
     this.logger = createLogger(this.constructor.name);
   }
 
-  abstract resolveProductPricing(query: string): Promise<{
-    product: Product;
-    prompt: string;
-  } | null>;
+  abstract resolveProductPricing(query: string): Promise<PricingResult | null>;
 
   /**
    * Validate price to reject placeholders and invalid values.

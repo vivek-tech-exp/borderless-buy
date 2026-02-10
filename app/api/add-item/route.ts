@@ -53,6 +53,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if ("error" in result) {
+      logger.warn("Pricing engine returned invalid query", {
+        query,
+        requestId,
+        message: result.error,
+      });
+      return NextResponse.json(
+        { error: result.error || "Product not found. Try a more specific name." },
+        { status: 404 }
+      );
+    }
+
     const { product, prompt } = result;
 
     const item: WishlistItem = {
