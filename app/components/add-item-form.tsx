@@ -45,7 +45,7 @@ export function AddItemForm({ onAdd }: AddItemFormProps) {
       <div className="flex flex-col sm:flex-row gap-4">
         <Input
           type="text"
-          placeholder="What is the next thing you want to own? (e.g., MacBook Pro M4, Leica Q3...)"
+          placeholder="What is the next thing you want to own? (e.g., MacBook Pro, Sony Camera...)"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           disabled={loading}

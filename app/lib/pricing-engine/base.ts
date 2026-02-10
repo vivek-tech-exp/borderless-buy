@@ -18,7 +18,7 @@ export type PricingResult =
 export interface PricingEngine {
   /**
    * Resolve a product query and return pricing across all supported countries.
-   * @param query - Product name or description (e.g., "MacBook Pro 14")
+   * @param query - Product name or description (e.g., "MacBook Pro")
    * @returns Product with pricing data and the prompt used for transparency
    */
   resolveProductPricing(query: string): Promise<PricingResult | null>;

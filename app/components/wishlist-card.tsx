@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CheckCircleIcon, XCircleIcon, ClockIcon, LightBulbIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { ClockIcon, TrashIcon } from "@heroicons/react/24/outline";
 import type { WishlistItem } from "@/types";
 import { COUNTRY_CODES, COUNTRY_LABELS } from "@/types";
 import { useCurrency } from "@/app/lib/currency-context";
@@ -44,7 +44,6 @@ export function WishlistCard({
   const [isFlipped, setIsFlipped] = useState(false);
   const [isEditingTag, setIsEditingTag] = useState(false);
   const [tagInput, setTagInput] = useState(item.tag ?? "");
-  const [showRationale, setShowRationale] = useState(false);
   const { convertToPreferred, preferredCurrency, preferredCountry, rates } = useCurrency();
   const { product } = item;
 
@@ -52,11 +51,6 @@ export function WishlistCard({
     setTagInput(item.tag ?? "");
   }, [item.tag]);
 
-  useEffect(() => {
-    if (!product.isVagueQuery) {
-      setShowRationale(false);
-    }
-  }, [product.isVagueQuery]);
 
   const pricesByCountry = COUNTRY_CODES.map((code) => {
     const p = product.pricing[code];
@@ -113,15 +107,25 @@ export function WishlistCard({
     : null;
 
   const homeRow = pricesByCountry.find((row) => row.code === preferredCountry);
-  const topMarkets = withConverted
-    .slice()
-    .sort((a, b) => a.convertedPrice - b.convertedPrice)
-    .slice(0, 3);
-  const flipMarkets = [homeRow, ...withConverted.filter((row) => row.code !== preferredCountry)]
-    .filter(Boolean) as typeof pricesByCountry;
-  const flipMarketsTop = flipMarkets
-    .filter((row, index, arr) => arr.findIndex((r) => r.code === row.code) === index)
-    .slice(0, 9);
+  const sortedMarkets = withConverted.slice().sort((a, b) => a.convertedPrice - b.convertedPrice);
+  const bestMarket = sortedMarkets[0] ?? null;
+  const homeInSorted = sortedMarkets.find((row) => row.code === preferredCountry) ?? null;
+  const withoutHome = sortedMarkets.filter((row) => row.code !== preferredCountry);
+  const maxRanks = 9;
+  const leaderboard = homeInSorted
+    ? [...withoutHome.slice(0, maxRanks - 1), homeInSorted]
+    : withoutHome.slice(0, maxRanks);
+
+  const showIncome = Number.isFinite(incomeAmount) && (incomeAmount ?? 0) > 0;
+  const bestRatio = showIncome && bestMarket?.convertedPrice
+    ? bestMarket.convertedPrice / incomeAmount
+    : null;
+  const homeRatio = showIncome && homeCountryData?.convertedPrice != null
+    ? homeCountryData.convertedPrice / incomeAmount
+    : null;
+  const savings = bestMarket && homeCountryData?.convertedPrice != null
+    ? homeCountryData.convertedPrice - bestMarket.convertedPrice
+    : null;
 
   const commitTag = () => {
     if (!onUpdateTag) {
@@ -170,52 +174,15 @@ export function WishlistCard({
                 {product.carryOnFriendly ? "Buy abroad" : "Buy local"}
               </span>
             </div>
-            {product.isVagueQuery && product.selectionRationale && (
-              <div className="mt-1">
-                <button
-                  type="button"
-                  className="text-xs underline decoration-dotted transition-colors"
-                  style={{color: 'var(--text-tertiary)'}}
-                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--text-secondary)'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
-                  onClick={() => setShowRationale((prev) => !prev)}
-                  aria-expanded={showRationale}
-                  aria-controls={`rationale-${item.id}`}
-                >
-                  Why this pick?
-                </button>
-                {showRationale && (
-                  <div
-                    id={`rationale-${item.id}`}
-                    className="mt-2 rounded-lg border p-3 text-xs"
-                    style={{backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)', color: 'var(--text-secondary)'}}
-                  >
-                    {product.selectionRationale}
-                  </div>
-                )}
-              </div>
-            )}
             <div className="flex flex-wrap items-center gap-2 mt-2">
-              {!isEditingTag && item.tag && (
+              {!isEditingTag && (
                 <button
                   type="button"
                   onClick={() => setIsEditingTag(true)}
-                  className="text-xs rounded-full px-2 py-0.5 transition-colors"
-                  style={{backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)'}}
+                  className="text-[11px] rounded-full border px-2.5 py-1 transition-colors"
+                  style={{borderColor: 'var(--border-primary)', color: 'var(--text-secondary)'}}
                 >
-                  #{item.tag}
-                </button>
-              )}
-              {!isEditingTag && !item.tag && onUpdateTag && (
-                <button
-                  type="button"
-                  onClick={() => setIsEditingTag(true)}
-                  className="text-xs transition-colors"
-                  style={{color: 'var(--accent-primary)'}}
-                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
-                >
-                  + Add goal tag
+                  {item.tag ? `Goal: ${item.tag}` : "Set goal"}
                 </button>
               )}
               {isEditingTag && (
@@ -230,7 +197,7 @@ export function WishlistCard({
                     type="text"
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
-                    placeholder="Goal tag"
+                    placeholder="Goal"
                     list={`goal-tags-${item.id}`}
                     className="h-8 px-3 py-1 text-xs w-36"
                     aria-label="Goal tag"
@@ -358,35 +325,51 @@ export function WishlistCard({
               >
                 {/* Front */}
                 <div style={{ backfaceVisibility: 'hidden' }}>
-                  {/* Best Price Highlight */}
-                  {best && (
-                    <div
-                      className="mb-4 p-4 rounded-xl border"
-                      style={{
-                        background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(16,185,129,0.02))',
-                        borderColor: 'var(--accent-primary)',
-                        boxShadow: '0 10px 30px rgba(16, 185, 129, 0.12)',
-                      }}
-                    >
-                      <p className="text-xs uppercase tracking-wide font-medium mb-1" style={{color: 'var(--text-secondary)'}}>
-                        💰 Best Available Price
-                      </p>
-                      <div className="flex flex-wrap items-baseline gap-2">
-                        <span className="text-[32px] font-bold" style={{color: 'var(--accent-primary)'}}>
-                          {formatCurrency(best.convertedPrice, preferredCurrency, { maxFractionDigits: 0 })}
-                        </span>
-                        <span className="text-sm" style={{color: 'var(--text-secondary)'}}>
-                          in {best.label}
-                        </span>
-                        {incomeRatioLabel && (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-medium"
-                            style={{borderColor: 'var(--accent-primary)', color: 'var(--accent-primary)', backgroundColor: 'var(--bg-secondary)'}}
-                          >
-                            <ClockIcon className="h-3 w-3" />
-                            {incomeRatioLabel.replace(" your monthly income", "")}
+                  <div className="grid gap-3 sm:grid-cols-[1.4fr_1fr]">
+                    <div className="rounded-xl border p-3" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                          Arbitrage
+                        </p>
+                        {savings != null && savings > 0 && (
+                          <span className="text-[11px] font-medium" style={{color: 'var(--accent-primary)'}}>
+                            Save {formatCurrency(savings, preferredCurrency, { maxFractionDigits: 0 })}
                           </span>
                         )}
+                      </div>
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        <div className="rounded-lg border p-2.5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}>
+                          <p className="text-[10px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                            Cheapest
+                          </p>
+                          <p className="text-xs mt-1" style={{color: 'var(--text-secondary)'}}>
+                            {best ? best.label : "—"}
+                          </p>
+                          <p className="text-sm font-semibold mt-1" style={{color: 'var(--text-primary)'}}>
+                            {best ? formatCurrency(best.convertedPrice, preferredCurrency, { maxFractionDigits: 0 }) : "—"}
+                          </p>
+                          {bestRatio && (
+                            <p className="text-[10px] mt-0.5" style={{color: 'var(--text-tertiary)'}}>
+                              {bestRatio.toFixed(1)}x income
+                            </p>
+                          )}
+                        </div>
+                        <div className="rounded-lg border p-2.5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}>
+                          <p className="text-[10px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                            Home price
+                          </p>
+                          <p className="text-xs mt-1" style={{color: 'var(--text-secondary)'}}>
+                            {COUNTRY_LABELS[preferredCountry]}
+                          </p>
+                          <p className="text-sm font-semibold mt-1" style={{color: 'var(--text-primary)'}}>
+                            {hasHomePrice ? formatCurrency(homeCountryData!.convertedPrice!, preferredCurrency, { maxFractionDigits: 0 }) : "—"}
+                          </p>
+                          {homeRatio && (
+                            <p className="text-[10px] mt-0.5" style={{color: 'var(--text-tertiary)'}}>
+                              {homeRatio.toFixed(1)}x income
+                            </p>
+                          )}
+                        </div>
                       </div>
                       {!incomeRatioLabel && (
                         <button
@@ -397,31 +380,33 @@ export function WishlistCard({
                           onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
                           onClick={onIncomeFocus}
                         >
-                          Add income to see affordability
+                          Add income to compare affordability
                         </button>
                       )}
                     </div>
-                  )}
 
-                  {topMarkets.length > 0 && (
-                    <div className="mb-4 rounded-xl border p-3" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
-                      <div className="flex items-center justify-between">
-                        <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                          Top markets
-                        </p>
-                        <span className="text-[10px]" style={{color: 'var(--text-tertiary)'}}>
-                          Sorted by cheapest
-                        </span>
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {topMarkets.map((row) => (
-                          <div key={row.code} className="rounded-full border px-2.5 py-1 text-xs" style={{borderColor: 'var(--border-primary)', color: 'var(--text-secondary)'}}>
-                            {row.label} · {formatCurrency(row.convertedPrice, preferredCurrency, { maxFractionDigits: 0 }).replace(/^[^0-9]+/, "")}
-                          </div>
-                        ))}
+                    <div className="rounded-xl border p-3" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+                      <p className="text-[11px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                        Logistics
+                      </p>
+                      <div className="mt-2 grid gap-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span>Power</span>
+                          <span style={{color: 'var(--text-tertiary)'}}>Check</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span>Warranty</span>
+                          <span style={{color: 'var(--text-tertiary)'}}>Varies</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span>Carry-on</span>
+                          <span style={{color: product.carryOnFriendly ? 'var(--accent-primary)' : 'var(--text-tertiary)'}}>
+                            {product.carryOnFriendly ? "Ready" : "Check"}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  )}
+                  </div>
 
                   <button
                     type="button"
@@ -443,7 +428,7 @@ export function WishlistCard({
                   <div className="pt-4">
                     <div className="mb-3 flex items-center justify-between">
                       <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                        All markets (top 9)
+                        The leaderboard
                       </p>
                       <button
                         type="button"
@@ -453,35 +438,74 @@ export function WishlistCard({
                         onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-tertiary)'}
                         onClick={() => setIsFlipped(false)}
                       >
-                        Back
+                        Back to summary
                       </button>
                     </div>
-                    <div>
-                      <div className="grid grid-cols-3 gap-2">
-                      {flipMarketsTop.map((row) => {
-                        const color = ITEM_CHART_COLORS[row.code];
+                    <div className="relative">
+                      <div className="max-h-[280px] overflow-y-auto pr-1 space-y-2">
+                      {leaderboard.map((row, index) => {
+                        const isBest = bestMarket?.code === row.code;
+                        const isHome = row.code === preferredCountry;
                         const hasPrice = row.convertedValid && row.convertedPrice != null;
-                        const ratio = incomeAmount && incomeAmount > 0 && row.convertedPrice
-                          ? row.convertedPrice / incomeAmount
+                        const diff = bestMarket && hasPrice
+                          ? row.convertedPrice - bestMarket.convertedPrice
                           : null;
+
+                        const background = isBest
+                          ? 'rgba(16,185,129,0.10)'
+                          : 'var(--bg-secondary)';
+                        const borderColor = isHome && !isBest
+                          ? '#f59e0b'
+                          : 'var(--border-primary)';
 
                         return (
                           <div
                             key={row.code}
-                            className="rounded-lg border p-2.5"
-                            style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}
+                            className="rounded-lg border px-3 py-1.5"
+                            style={{backgroundColor: background, borderColor}}
                           >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex items-center gap-1.5">
-                                <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: color }} aria-hidden />
-                                <span className="text-[11px] font-medium" style={{color: 'var(--text-secondary)'}}>
-                                  {row.label}
-                                </span>
+                            <div className="grid grid-cols-[24px_1fr_auto] items-center gap-2">
+                              <div className="text-[11px] font-medium" style={{color: 'var(--text-tertiary)'}}>
+                                {index + 1}.
                               </div>
-                              <div className="flex items-center gap-1.5">
-                                {row.code === preferredCountry && (
-                                  <span className="text-[9px] uppercase tracking-wider" style={{color: 'var(--accent-primary)'}}>
-                                    Home
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[13px] font-medium" style={{color: 'var(--text-primary)'}}>
+                                    {row.label}
+                                  </span>
+                                  {isBest && (
+                                    <span className="text-[9px] uppercase tracking-wider" style={{color: 'var(--accent-primary)'}}>
+                                      Best
+                                    </span>
+                                  )}
+                                  {isHome && !isBest && (
+                                    <span className="text-[9px] uppercase tracking-wider" style={{color: '#f59e0b'}}>
+                                      Home
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 text-[10px]" style={{color: 'var(--text-tertiary)'}}>
+                                  <span>
+                                    {hasPrice
+                                      ? formatCurrency(row.convertedPrice!, preferredCurrency, { maxFractionDigits: 0 })
+                                      : "Not available"}
+                                  </span>
+                                  {diff != null && diff > 0 && (
+                                    <span>
+                                      +{formatCurrency(diff, preferredCurrency, { maxFractionDigits: 0 })}
+                                    </span>
+                                  )}
+                                  {showIncome && hasPrice && (
+                                    <span>
+                                      {(row.convertedPrice / incomeAmount).toFixed(1)}x income
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {row.priceSource && (
+                                  <span className="text-[9px] uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                                    {row.priceSource}
                                   </span>
                                 )}
                                 {row.buyingLink && (
@@ -489,36 +513,25 @@ export function WishlistCard({
                                     href={row.buyingLink}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="text-[11px]"
+                                    className="text-[10px]"
                                     style={{color: 'var(--accent-primary)'}}
                                     onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
                                     onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
-                                    title={row.priceSource ? `Source: ${row.priceSource}` : "View retailer"}
                                   >
-                                    ↗
+                                    Buy ↗
                                   </a>
                                 )}
                               </div>
                             </div>
-                            <p className="mt-1 text-sm font-semibold tabular-nums" style={{color: hasPrice ? 'var(--text-primary)' : 'var(--text-tertiary)'}}>
-                              {hasPrice
-                                ? formatCurrency(row.convertedPrice!, preferredCurrency, { maxFractionDigits: 0 })
-                                : "Not available"}
-                            </p>
-                            {ratio && (
-                              <p className="text-[10px] mt-0.5" style={{color: 'var(--text-tertiary)'}}>
-                                {ratio.toFixed(1)}x monthly
-                              </p>
-                            )}
-                            {row.priceSource && row.buyingLink && (
-                              <p className="text-[9px] mt-0.5 uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                                {row.priceSource}
-                              </p>
-                            )}
                           </div>
                         );
                       })}
                       </div>
+                      <div
+                        className="pointer-events-none absolute bottom-0 left-0 h-6 w-full"
+                        style={{background: 'linear-gradient(180deg, rgba(0,0,0,0), var(--bg-primary))'}}
+                        aria-hidden
+                      />
                     </div>
                   </div>
                 </div>
