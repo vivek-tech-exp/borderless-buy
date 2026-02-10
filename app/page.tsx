@@ -483,8 +483,9 @@ export default function MainDashboard() {
         {/* Hero Section: Logo + Tagline + Currency + Info Button */}
         <div className="flex items-start justify-between gap-4 mb-8">
           <div className="flex-1">
-            <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]">
-              One Day, Baby
+            <h1 className="text-3xl font-bold tracking-tight text-[var(--text-primary)]" style={{textShadow: '0 6px 18px rgba(0,0,0,0.12)'}}>
+              <span className="tracking-[0.04em]">ONE DAY, </span>
+              <span className="tracking-[0.04em]" style={{color: 'var(--accent-primary)', textShadow: '0 8px 20px rgba(16,185,129,0.25)'}}>BABY</span>
             </h1>
             <p className="mt-2 text-sm text-[var(--text-secondary)]">
               Unapologetically Materialistic. Intelligently Sourced.
