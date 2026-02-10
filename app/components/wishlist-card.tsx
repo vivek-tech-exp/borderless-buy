@@ -14,6 +14,15 @@ function getGoogleSearchUrl(query: string) {
   return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 }
 
+function normalizePriceSource(source?: string) {
+  if (!source) return "Buy";
+  const lowered = source.toLowerCase();
+  if (lowered.includes("unable to find") || lowered.includes("no direct") || lowered.includes("search result")) {
+    return "Store search";
+  }
+  return source;
+}
+
 export type ViewMode = "local" | "global";
 
 interface WishlistCardProps {
@@ -142,6 +151,7 @@ export function WishlistCard({
   const savings = bestMarket && homeCountryData?.convertedPrice != null
     ? homeCountryData.convertedPrice - bestMarket.convertedPrice
     : null;
+  const isHomeBest = !!best && !!homeCountryData && best.code === homeCountryData.code;
 
   const productName = product.displayName;
   const bestCountryName = bestMarket?.label;
@@ -408,42 +418,62 @@ export function WishlistCard({
                       </div>
                       {hasPricing && (
                         <div className="mt-2 grid grid-cols-2 gap-2">
-                        <div className="rounded-lg border p-2.5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}>
-                          <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                            Best value
-                          </p>
-                          <p className="text-xs mt-1" style={{color: 'var(--text-secondary)'}}>
-                            {best ? best.label : "—"}
-                          </p>
-                          <p className="text-sm font-semibold mt-1" style={{color: 'var(--text-primary)'}}>
-                            {best ? formatCurrency(best.convertedPrice, preferredCurrency, { maxFractionDigits: 0 }) : "—"}
-                          </p>
-                          {best?.priceSource && best?.buyingLink && (
-                            <div className="mt-1 max-w-full overflow-hidden">
-                              <a
-                                href={best.buyingLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-xs"
-                                style={{color: 'var(--accent-primary)'}}
-                                onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
-                                onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
-                              >
-                                <span className="min-w-0 flex-1 truncate">{best.priceSource}</span>
-                                <span aria-hidden>↗</span>
-                              </a>
+                        <div className="relative rounded-lg border p-2.5 pt-6" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}>
+                          <div className="absolute right-0 top-0">
+                            <div className="relative">
+                              <div className="rounded-bl-md px-2 py-1 text-[10px] uppercase tracking-wider text-white" style={{backgroundColor: 'var(--accent-primary)'}}>
+                                Best value
+                              </div>
+                              <div className="absolute right-0 top-full h-2 w-2" style={{backgroundColor: 'var(--accent-primary)'}} />
                             </div>
-                          )}
-                          {bestRatio && (
-                            <p className="text-xs mt-0.5" style={{color: 'var(--text-tertiary)'}}>
-                              {bestRatio.toFixed(2)}x income
-                            </p>
+                          </div>
+                          {isHomeBest ? (
+                            <div className="flex h-full flex-col items-center justify-center py-3 text-center">
+                              <p className="text-lg font-semibold" style={{color: 'var(--accent-primary)'}}>
+                                Home wins
+                              </p>
+                            </div>
+                          ) : (
+                            <>
+                              <p className="text-xs mt-1" style={{color: 'var(--text-secondary)'}}>
+                                {best ? best.label : "—"}
+                              </p>
+                              <p className="text-sm font-semibold mt-1" style={{color: 'var(--text-primary)'}}>
+                                {best ? formatCurrency(best.convertedPrice, preferredCurrency, { maxFractionDigits: 0 }) : "—"}
+                              </p>
+                              {best?.priceSource && best?.buyingLink && (
+                                <div className="mt-1 max-w-full overflow-hidden">
+                                  <a
+                                    href={best.buyingLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-1 text-xs"
+                                    style={{color: 'var(--accent-primary)'}}
+                                    onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
+                                  >
+                                    <span className="min-w-0 flex-1 truncate">{normalizePriceSource(best.priceSource)}</span>
+                                    <span aria-hidden>↗</span>
+                                  </a>
+                                </div>
+                              )}
+                              {bestRatio && (
+                                <p className="text-xs mt-0.5" style={{color: 'var(--text-tertiary)'}}>
+                                  {bestRatio.toFixed(2)}x income
+                                </p>
+                              )}
+                            </>
                           )}
                         </div>
-                        <div className="rounded-lg border p-2.5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}>
-                          <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                            Home price
-                          </p>
+                        <div className="relative rounded-lg border p-2.5 pt-6" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}>
+                          <div className="absolute right-0 top-0">
+                            <div className="relative">
+                              <div className="rounded-bl-md px-2 py-1 text-[10px] uppercase tracking-wider" style={{backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)'}}>
+                                Home price
+                              </div>
+                              <div className="absolute right-0 top-full h-2 w-2" style={{backgroundColor: 'var(--bg-tertiary)'}} />
+                            </div>
+                          </div>
                           <p className="text-xs mt-1" style={{color: 'var(--text-secondary)'}}>
                             {COUNTRY_LABELS[preferredCountry]}
                           </p>
@@ -461,7 +491,7 @@ export function WishlistCard({
                                 onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
                                 onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
                               >
-                                <span className="min-w-0 flex-1 truncate">{homeCountryData.priceSource}</span>
+                                <span className="min-w-0 flex-1 truncate">{normalizePriceSource(homeCountryData.priceSource)}</span>
                                 <span aria-hidden>↗</span>
                               </a>
                             </div>
@@ -662,7 +692,7 @@ export function WishlistCard({
                               <div className="flex items-center gap-2">
                                 {row.priceSource && (
                                     <span className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                                    {row.priceSource}
+                                      {normalizePriceSource(row.priceSource)}
                                   </span>
                                 )}
                                 {row.buyingLink && (

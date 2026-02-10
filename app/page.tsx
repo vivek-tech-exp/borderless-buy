@@ -38,7 +38,9 @@ export default function MainDashboard() {
   const [expandHome, setExpandHome] = useState(true);
   const [selectedBestCode, setSelectedBestCode] = useState<string | null>(null);
   const [selectedCompareCode, setSelectedCompareCode] = useState<string | null>(null);
+  const [totalsHighlight, setTotalsHighlight] = useState(false);
   const hasLoadedFromStorage = useRef(false);
+  const totalsPanelRef = useRef<HTMLDivElement | null>(null);
 
   const { convertToPreferred, preferredCurrency, preferredCountry } = useCurrency();
 
@@ -583,6 +585,16 @@ export default function MainDashboard() {
   }, [preferredCountry, selectedCompareCode]);
   const showTotals = itemsForTotals.length > 0;
 
+  useEffect(() => {
+    if (!totalsExpanded) return;
+    const timer = setTimeout(() => {
+      totalsPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setTotalsHighlight(true);
+      setTimeout(() => setTotalsHighlight(false), 900);
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [totalsExpanded]);
+
   return (
     <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
       <header className="mb-12">
@@ -888,11 +900,20 @@ export default function MainDashboard() {
               <button
                 type="button"
                 onClick={() => setTotalsExpanded((prev) => !prev)}
-                className="rounded-md px-2.5 py-1 text-xs text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-primary)] hover:text-[var(--text-secondary)] sm:hidden"
+                className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors sm:hidden"
+                style={{borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-primary)'}}
                 aria-expanded={totalsExpanded}
                 aria-controls="totals-panel"
               >
-                {totalsExpanded ? "Hide" : "Show"}
+                {totalsExpanded ? "Hide details" : "Show details"}
+                <svg
+                  className={`h-3.5 w-3.5 transition-transform ${totalsExpanded ? "rotate-180" : ""}`}
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden
+                >
+                  <path d="M5.23 7.21a.75.75 0 011.06.02L10 11.2l3.71-3.97a.75.75 0 111.1 1.02l-4.25 4.55a.75.75 0 01-1.1 0L5.21 8.27a.75.75 0 01.02-1.06z" />
+                </svg>
               </button>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm" style={{color: 'var(--text-secondary)'}}>
@@ -911,7 +932,8 @@ export default function MainDashboard() {
           </div>
           <div
             id="totals-panel"
-            className={`${totalsExpanded ? "block" : "hidden"} sm:block transition-all duration-200`}
+            ref={totalsPanelRef}
+            className={`${totalsExpanded ? "block" : "hidden"} sm:block transition-all duration-200 ${totalsHighlight ? "ring-2 ring-emerald-200/60" : ""}`}
           >
             {viewMode === "local" ? (
               /* Local Mode - Show only home country total */
@@ -934,44 +956,29 @@ export default function MainDashboard() {
               /* Global Mode - Show all countries */
               <>
                 <div className="space-y-4">
-                  <div
-                    className="relative overflow-hidden rounded-2xl border px-4 py-4 sm:px-5"
-                    style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}
-                  >
-                    <div
-                      className="absolute inset-y-0 left-0 w-1.5"
-                      style={{backgroundColor: 'var(--accent-primary)', opacity: 0.6}}
-                      aria-hidden
-                    />
-                    <div
-                      className="absolute -left-6 top-4 h-12 w-12 rounded-full border"
-                      style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}
-                      aria-hidden
-                    />
-                    <div className="relative flex items-start justify-between gap-3">
+                  <div className="rounded-2xl border px-4 py-4 sm:px-5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+                    <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                          Best value total
+                          Best market right now
                         </p>
-                        <p className="mt-1 text-2xl sm:text-3xl font-semibold" style={{color: 'var(--accent-primary)'}}>
-                          {effectiveBestMarket?.total ? formatCurrency(effectiveBestMarket.total, preferredCurrency) : "Not available"}
+                        <p className="mt-1 text-lg sm:text-xl font-semibold" style={{color: 'var(--text-primary)'}}>
+                          {effectiveBestMarket?.label ?? "Best market"}
                         </p>
-                        <p className="text-xs sm:text-sm" style={{color: 'var(--text-tertiary)'}}>
-                          {effectiveBestMarket?.label ? `${effectiveBestMarket.label} selected` : "No totals available"}
-                        </p>
+                        <div className="mt-2 flex items-baseline gap-2">
+                          <span className="text-2xl sm:text-3xl font-semibold" style={{color: 'var(--accent-primary)'}}>
+                            {effectiveBestMarket?.total ? formatCurrency(effectiveBestMarket.total, preferredCurrency) : "Not available"}
+                          </span>
+                          <span className="text-xs sm:text-sm" style={{color: 'var(--text-tertiary)'}}>
+                            total for {itemsForTotals.length} {itemsForTotals.length === 1 ? "item" : "items"}
+                          </span>
+                        </div>
                       </div>
-                      <select
-                        value={effectiveBestCode ?? ""}
-                        onChange={(e) => setSelectedBestCode(e.target.value)}
-                        className="rounded-md border px-2 py-1 text-xs sm:text-sm"
-                        style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-secondary)'}}
-                      >
-                        {itemsByCountry.map((entry) => (
-                          <option key={entry.code} value={entry.code}>
-                            {entry.label}
-                          </option>
-                        ))}
-                      </select>
+                      {potentialSavings != null && potentialSavings > 0 && (
+                        <div className="inline-flex items-center rounded-full px-3 py-1 text-xs" style={{backgroundColor: 'var(--accent-light)', color: 'var(--accent-primary)'}}>
+                          Save {formatCurrency(potentialSavings, preferredCurrency)} vs home
+                        </div>
+                      )}
                     </div>
                     <details
                       className="mt-4 rounded-xl border px-4 py-3"
@@ -980,7 +987,7 @@ export default function MainDashboard() {
                       onToggle={(e) => setExpandCheapest((e.target as HTMLDetailsElement).open)}
                     >
                       <summary className="cursor-pointer text-xs sm:text-sm font-medium" style={{color: 'var(--text-secondary)'}}>
-                        Selected market items
+                        View items in {effectiveBestMarket?.label ?? "best market"}
                       </summary>
                       <div className="mt-3 space-y-3">
                         {bestItems.length === 0 && (
@@ -1026,35 +1033,15 @@ export default function MainDashboard() {
                     </details>
                   </div>
 
-                  <div
-                    className="relative overflow-hidden rounded-2xl border px-4 py-4 sm:px-5"
-                    style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}
-                  >
-                    <div
-                      className="absolute inset-y-0 left-0 w-1.5"
-                      style={{backgroundColor: 'var(--text-tertiary)', opacity: 0.5}}
-                      aria-hidden
-                    />
-                    <div
-                      className="absolute -left-6 top-4 h-12 w-12 rounded-full border"
-                      style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}
-                      aria-hidden
-                    />
-                    <div className="relative flex items-start justify-between gap-3">
+                  <div className="rounded-2xl border px-4 py-4 sm:px-5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+                    <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                          Compare market
+                          Compare another market
                         </p>
-                        <p className="mt-1 text-2xl sm:text-3xl font-semibold" style={{color: 'var(--text-primary)'}}>
-                          {compareTotal > 0 ? formatCurrency(compareTotal, preferredCurrency) : "Not available"}
+                        <p className="text-sm sm:text-base font-medium" style={{color: 'var(--text-secondary)'}}>
+                          See how close it gets to the best value
                         </p>
-                        <div className="mt-1 flex flex-wrap items-center gap-2">
-                          <span className="text-xs sm:text-sm" style={{color: 'var(--text-tertiary)'}}>
-                            {compareSavings != null && compareSavings > 0
-                              ? `About ${formatCurrency(compareSavings, preferredCurrency)} above best value`
-                              : "Aligned with the best value total"}
-                          </span>
-                        </div>
                       </div>
                       <select
                         value={effectiveCompareCode ?? ""}
@@ -1069,6 +1056,16 @@ export default function MainDashboard() {
                         ))}
                       </select>
                     </div>
+                    <div className="mt-3 flex items-baseline gap-2">
+                      <span className="text-xl font-semibold" style={{color: 'var(--text-primary)'}}>
+                        {compareTotal > 0 ? formatCurrency(compareTotal, preferredCurrency) : "Not available"}
+                      </span>
+                      <span className="text-xs sm:text-sm" style={{color: 'var(--text-tertiary)'}}>
+                        {compareSavings != null && compareSavings > 0
+                          ? `About ${formatCurrency(compareSavings, preferredCurrency)} above best value`
+                          : "Aligned with the best value total"}
+                      </span>
+                    </div>
                     <details
                       className="mt-4 rounded-xl border px-4 py-3"
                       style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}
@@ -1076,7 +1073,7 @@ export default function MainDashboard() {
                       onToggle={(e) => setExpandHome((e.target as HTMLDetailsElement).open)}
                     >
                       <summary className="cursor-pointer text-xs sm:text-sm font-medium" style={{color: 'var(--text-secondary)'}}>
-                        Compare market items
+                        View items in {COUNTRY_LABELS[effectiveCompareCode as keyof typeof COUNTRY_LABELS]}
                       </summary>
                       <div className="mt-3 space-y-3">
                         {compareItems.length === 0 && (
