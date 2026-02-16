@@ -1,188 +1,211 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import jwt from "jsonwebtoken";
+import type { WishlistItem } from "@/types";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const SUPABASE_PUBLISHABLE = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
 const SUPABASE_SECRET = process.env.SUPABASE_SECRET_KEY ?? "";
 
-/**
- * Verify JWT token and extract user ID.
- * JWT tokens from Supabase contain the user ID in the 'sub' claim.
- */
-function verifyTokenAndGetUserId(token: string): string | null {
+type WishlistRow = {
+  id: string;
+  product: WishlistItem["product"];
+  tag: string | null;
+  created_at: string;
+};
+
+type WishlistPostBody = {
+  item?: {
+    id?: string;
+    product?: WishlistItem["product"];
+    tag?: string | null;
+  };
+};
+
+type WishlistPatchBody = {
+  id?: string;
+  tag?: string | null;
+};
+
+function errorResponse(message: string, status: number): NextResponse {
+  return NextResponse.json({ error: message }, { status });
+}
+
+function extractBearerToken(request: NextRequest): string | null {
+  const authHeader = request.headers.get("authorization")?.trim() ?? "";
+  if (!authHeader) return null;
+  return authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : authHeader;
+}
+
+function extractUserIdFromToken(token: string): string | null {
+  const decoded = jwt.decode(token);
+  if (!decoded || typeof decoded === "string") return null;
+  return typeof decoded.sub === "string" ? decoded.sub : null;
+}
+
+function getAuthorizedUserId(request: NextRequest): { userId: string } | { response: NextResponse } {
+  const token = extractBearerToken(request);
+  if (!token) return { response: errorResponse("Missing access token", 401) };
+
+  const userId = extractUserIdFromToken(token);
+  if (!userId) return { response: errorResponse("Invalid token", 401) };
+
+  return { userId };
+}
+
+function sanitizeTag(tag: string | null | undefined): string | null {
+  if (typeof tag !== "string") return null;
+  const trimmed = tag.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+async function parseJsonBody<T>(request: NextRequest): Promise<T | null> {
   try {
-    // Decode without verification first to get the payload
-    const decoded = jwt.decode(token, { complete: true });
-    if (!decoded) return null;
-    // The 'sub' claim is the user ID
-    return (decoded.payload as any).sub ?? null;
+    return (await request.json()) as T;
   } catch {
     return null;
   }
 }
 
-/**
- * Create a server-side Supabase client for admin operations (using secret key).
- */
 function makeAdminClient() {
+  if (!SUPABASE_URL || !SUPABASE_SECRET) {
+    throw new Error("Missing Supabase configuration");
+  }
   return createClient(SUPABASE_URL, SUPABASE_SECRET, {
     auth: { persistSession: false },
   });
 }
 
 export async function GET(request: NextRequest) {
+  const auth = getAuthorizedUserId(request);
+  if ("response" in auth) return auth.response;
+
   try {
-    const auth = request.headers.get("authorization") ?? "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth || undefined;
-    if (!token) return NextResponse.json({ error: "Missing access token" }, { status: 401 });
-
-    const userId = verifyTokenAndGetUserId(token);
-    if (!userId) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-
     const supabase = makeAdminClient();
     const { data, error } = await supabase
       .from("wishlist")
       .select("id, product, tag, created_at")
-      .eq("user_id", userId)
+      .eq("user_id", auth.userId)
       .order("created_at", { ascending: false });
 
     if (error) {
       console.error("GET /api/wishlist error:", error.message);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return errorResponse(error.message, 500);
     }
 
-    // Map to client WishlistItem shape
-    const items = (data ?? []).map((r: any) => ({
-      id: r.id,
-      product: r.product,
-      tag: r.tag ?? undefined,
-      createdAt: r.created_at,
+    const rows = (data ?? []) as WishlistRow[];
+    const items: WishlistItem[] = rows.map((row) => ({
+      id: row.id,
+      product: row.product,
+      tag: row.tag ?? undefined,
+      createdAt: row.created_at,
     }));
+
     return NextResponse.json({ items });
-  } catch (err) {
-    console.error("GET /api/wishlist exception:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (error) {
+    console.error("GET /api/wishlist exception:", error);
+    return errorResponse("Internal server error", 500);
   }
 }
 
 export async function POST(request: NextRequest) {
+  const auth = getAuthorizedUserId(request);
+  if ("response" in auth) return auth.response;
+
   try {
-    const auth = request.headers.get("authorization") ?? "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth || undefined;
-    if (!token) return NextResponse.json({ error: "Missing access token" }, { status: 401 });
-
-    const userId = verifyTokenAndGetUserId(token);
-    if (!userId) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-
-    const body = await request.json();
+    const body = await parseJsonBody<WishlistPostBody>(request);
     const item = body?.item;
-    if (!item || !item.id || !item.product) {
-      return NextResponse.json({ error: "Invalid item payload" }, { status: 400 });
+    if (!item || typeof item.id !== "string" || !item.product) {
+      return errorResponse("Invalid item payload", 400);
     }
-
-    const tag = typeof item.tag === "string" ? item.tag.trim() : "";
-    const sanitizedTag = tag.length > 0 ? tag : null;
 
     const supabase = makeAdminClient();
     const { error } = await supabase.from("wishlist").insert([
-      { id: item.id, user_id: userId, product: item.product, tag: sanitizedTag },
+      {
+        id: item.id,
+        user_id: auth.userId,
+        product: item.product,
+        tag: sanitizeTag(item.tag),
+      },
     ]);
+
     if (error) {
-      console.error("POST /api/wishlist insert error:", error.message);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("POST /api/wishlist error:", error.message);
+      return errorResponse(error.message, 500);
     }
 
     return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("POST /api/wishlist exception:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (error) {
+    console.error("POST /api/wishlist exception:", error);
+    return errorResponse("Internal server error", 500);
   }
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = getAuthorizedUserId(request);
+  if ("response" in auth) return auth.response;
+
   try {
-    const auth = request.headers.get("authorization") ?? "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth || undefined;
-    if (!token) return NextResponse.json({ error: "Missing access token" }, { status: 401 });
-
-    const userId = verifyTokenAndGetUserId(token);
-    if (!userId) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-
-    const url = new URL(request.url);
-    const itemId = url.searchParams.get("id");
+    const itemId = new URL(request.url).searchParams.get("id")?.trim();
     if (!itemId) {
-      return NextResponse.json({ error: "Missing item id" }, { status: 400 });
+      return errorResponse("Missing item id", 400);
     }
 
     const supabase = makeAdminClient();
-    
-    // First verify the item belongs to this user
     const { data: existing, error: selectError } = await supabase
       .from("wishlist")
       .select("id")
       .eq("id", itemId)
-      .eq("user_id", userId)
+      .eq("user_id", auth.userId)
       .single();
 
     if (selectError || !existing) {
-      // Either item doesn't exist or doesn't belong to user (permission denied)
-      return NextResponse.json({ error: "Item not found or unauthorized" }, { status: 404 });
+      return errorResponse("Item not found or unauthorized", 404);
     }
 
-    // Delete the item
-    const { error: deleteError } = await supabase
+    const { error } = await supabase
       .from("wishlist")
       .delete()
       .eq("id", itemId)
-      .eq("user_id", userId);
+      .eq("user_id", auth.userId);
 
-    if (deleteError) {
-      console.error("DELETE /api/wishlist error:", deleteError.message);
-      return NextResponse.json({ error: deleteError.message }, { status: 500 });
+    if (error) {
+      console.error("DELETE /api/wishlist error:", error.message);
+      return errorResponse(error.message, 500);
     }
 
     return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("DELETE /api/wishlist exception:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (error) {
+    console.error("DELETE /api/wishlist exception:", error);
+    return errorResponse("Internal server error", 500);
   }
 }
 
 export async function PATCH(request: NextRequest) {
+  const auth = getAuthorizedUserId(request);
+  if ("response" in auth) return auth.response;
+
   try {
-    const auth = request.headers.get("authorization") ?? "";
-    const token = auth.startsWith("Bearer ") ? auth.slice(7) : auth || undefined;
-    if (!token) return NextResponse.json({ error: "Missing access token" }, { status: 401 });
-
-    const userId = verifyTokenAndGetUserId(token);
-    if (!userId) return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-
-    const body = await request.json();
-    const itemId = body?.id;
-    if (!itemId || typeof itemId !== "string") {
-      return NextResponse.json({ error: "Missing item id" }, { status: 400 });
+    const body = await parseJsonBody<WishlistPatchBody>(request);
+    const itemId = body?.id?.trim();
+    if (!itemId) {
+      return errorResponse("Missing item id", 400);
     }
 
-    const rawTag = typeof body?.tag === "string" ? body.tag : "";
-    const trimmedTag = rawTag.trim();
-    const sanitizedTag = trimmedTag.length > 0 ? trimmedTag : null;
-
     const supabase = makeAdminClient();
-    const { error: updateError } = await supabase
+    const { error } = await supabase
       .from("wishlist")
-      .update({ tag: sanitizedTag })
+      .update({ tag: sanitizeTag(body?.tag) })
       .eq("id", itemId)
-      .eq("user_id", userId);
+      .eq("user_id", auth.userId);
 
-    if (updateError) {
-      console.error("PATCH /api/wishlist error:", updateError.message);
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    if (error) {
+      console.error("PATCH /api/wishlist error:", error.message);
+      return errorResponse(error.message, 500);
     }
 
     return NextResponse.json({ ok: true });
-  } catch (err) {
-    console.error("PATCH /api/wishlist exception:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (error) {
+    console.error("PATCH /api/wishlist exception:", error);
+    return errorResponse("Internal server error", 500);
   }
 }

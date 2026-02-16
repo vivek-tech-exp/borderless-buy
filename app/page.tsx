@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { GlobeAltIcon, ChartPieIcon, CurrencyDollarIcon, BellAlertIcon, LockClosedIcon } from "@heroicons/react/24/outline";
+import { useState, useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from "react";
+import { ChartPieIcon, CurrencyDollarIcon, LockClosedIcon } from "@heroicons/react/24/outline";
 import { AddItemForm } from "@/app/components/add-item-form";
 import { WishlistCard } from "@/app/components/wishlist-card";
 import { AnalyticsPie } from "@/app/components/analytics-pie";
@@ -9,18 +9,77 @@ import { CountryFlagSelector } from "@/app/components/country-flag-selector";
 import { PromptInfoModal } from "@/app/components/prompt-info-modal";
 import { ThemeSwitcher } from "@/app/components/theme-switcher";
 import { ViewModeToggle, type ViewMode } from "@/app/components/view-mode-toggle";
+import { MarketItemsList } from "@/app/components/market-items-list";
 import { Input } from "@/app/components/ui/input";
 import { useCurrency } from "@/app/lib/currency-context";
 import { supabase } from "@/app/lib/supabase";
 import { SignInModal } from "@/app/components/sign-in-modal";
-import { COUNTRY_CODES, COUNTRY_LABELS } from "@/types";
-import { ITEM_CHART_COLORS } from "@/app/lib/constants";
+import { buildMarketSummary } from "@/app/lib/market-summary";
+import {
+  createWishlistItem,
+  createWishlistItemWithRetry,
+  deleteWishlistItem,
+  fetchWishlistItems,
+  getAccessToken,
+  updateWishlistTag,
+} from "@/app/lib/wishlist-client";
+import type { User } from "@supabase/supabase-js";
+import { COUNTRY_LABELS, type CountryCode } from "@/types";
 import { formatCurrency } from "@/app/lib/utils";
 import type { WishlistItem } from "@/types";
 
 const LOCAL_WISHLIST_KEY = "borderless-buy-guest-wishlist";
 const LOCAL_INCOME_KEY = "borderless-buy-income";
 const LOCAL_SELECTED_KEY = "borderless-buy-selected-items";
+const VIEW_MODE_KEY = "borderless-buy-view-mode";
+const MAX_INCOME_VALUE = 99_999_999;
+const RETRY_DELAYS_MS = [100, 200] as const;
+
+function clearGuestStorage() {
+  localStorage.removeItem(LOCAL_WISHLIST_KEY);
+  localStorage.removeItem(LOCAL_INCOME_KEY);
+}
+
+function removeSelectionId(previous: Set<string>, id: string): Set<string> {
+  const next = new Set(previous);
+  next.delete(id);
+  return next;
+}
+
+function hydrateGuestState(params: {
+  setItems: Dispatch<SetStateAction<WishlistItem[]>>;
+  setSelectedIds: Dispatch<SetStateAction<Set<string>>>;
+  setIncomeInput: Dispatch<SetStateAction<string>>;
+}) {
+  try {
+    const stored = localStorage.getItem(LOCAL_WISHLIST_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as WishlistItem[];
+      params.setItems(parsed);
+    }
+  } catch {
+    console.warn("Failed to load wishlist from localStorage");
+    localStorage.removeItem(LOCAL_WISHLIST_KEY);
+  }
+
+  try {
+    const storedSelected = localStorage.getItem(LOCAL_SELECTED_KEY);
+    if (storedSelected) {
+      const parsed = JSON.parse(storedSelected) as string[];
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        params.setSelectedIds(new Set(parsed));
+      }
+    }
+  } catch {
+    console.warn("Failed to load selected items from localStorage");
+    localStorage.removeItem(LOCAL_SELECTED_KEY);
+  }
+
+  const savedIncome = localStorage.getItem(LOCAL_INCOME_KEY);
+  if (savedIncome) {
+    params.setIncomeInput(savedIncome);
+  }
+}
 
 export default function MainDashboard() {
   // Initialize with empty arrays to match SSR (prevents hydration errors)
@@ -29,15 +88,18 @@ export default function MainDashboard() {
   const [lastPrompt, setLastPrompt] = useState<string | null>(null);
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [showSignInModal, setShowSignInModal] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [totalsExpanded, setTotalsExpanded] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>("global");
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window === "undefined") return "global";
+    const stored = localStorage.getItem(VIEW_MODE_KEY);
+    return stored === "local" || stored === "global" ? stored : "global";
+  });
   const [incomeInput, setIncomeInput] = useState<string>("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
   const [expandCheapest, setExpandCheapest] = useState(true);
   const [expandHome, setExpandHome] = useState(true);
-  const [selectedBestCode, setSelectedBestCode] = useState<string | null>(null);
-  const [selectedCompareCode, setSelectedCompareCode] = useState<string | null>(null);
+  const [selectedCompareCode, setSelectedCompareCode] = useState<CountryCode | null>(null);
   const [totalsHighlight, setTotalsHighlight] = useState(false);
   const hasLoadedFromStorage = useRef(false);
   const totalsPanelRef = useRef<HTMLDivElement | null>(null);
@@ -47,154 +109,41 @@ export default function MainDashboard() {
   // Load guest data from localStorage after mount (client-only, avoids hydration errors)
   useEffect(() => {
     if (hasLoadedFromStorage.current) return;
-    
-    try {
-      const stored = localStorage.getItem(LOCAL_WISHLIST_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored) as WishlistItem[];
-        setItems(parsed);
-      }
-    } catch (err) {
-      console.warn("Failed to load wishlist from localStorage");
-      localStorage.removeItem(LOCAL_WISHLIST_KEY);
-    }
 
-    try {
-      const storedSelected = localStorage.getItem(LOCAL_SELECTED_KEY);
-      if (storedSelected) {
-        const parsed = JSON.parse(storedSelected) as string[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setSelectedIds(new Set(parsed));
-        }
-      }
-    } catch (err) {
-      console.warn("Failed to load selected items from localStorage");
-      localStorage.removeItem(LOCAL_SELECTED_KEY);
-    }
-    
-    const savedIncome = localStorage.getItem(LOCAL_INCOME_KEY);
-    if (savedIncome) {
-      setIncomeInput(savedIncome);
-    }
-    
+    hydrateGuestState({
+      setItems,
+      setSelectedIds,
+      setIncomeInput,
+    });
+
     hasLoadedFromStorage.current = true;
   }, []);
 
   // Load persisted items for signed-in users; sync with auth state
   useEffect(() => {
     let mounted = true;
-    
-    async function load() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      
-      // Update user state immediately
-      if (session?.user && mounted) {
-        setUser(session.user);
-      }
-      
-      const token = session?.access_token;
-      if (!token || !mounted) return;
-      
-      try {
-        // First, check if we need to migrate guest data
-        const guestData = localStorage.getItem(LOCAL_WISHLIST_KEY);
-        let hasGuestData = false;
-        
-        if (guestData) {
-          try {
-            const parsed = JSON.parse(guestData);
-            hasGuestData = Array.isArray(parsed) && parsed.length > 0;
-          } catch {
-            // Corrupted data, ignore and clear it
-            localStorage.removeItem(LOCAL_WISHLIST_KEY);
-          }
-        }
-        
-        // If there's guest data, migrate it first
-        if (hasGuestData) {
-          await migrateGuestDataToServer();
-        }
-        
-        // Now load from server
-        const res = await fetch("/api/wishlist", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? "Failed to load wishlist");
-        if (mounted && data.items) {
-          setItems(data.items);
-          // Clear guest localStorage after successful sync
-          localStorage.removeItem(LOCAL_WISHLIST_KEY);
-          localStorage.removeItem(LOCAL_INCOME_KEY);
-        }
-      } catch (err: any) {
-        console.warn("Failed to load wishlist:", err?.message ?? String(err));
-      }
-    }
 
-    async function migrateGuestDataToServer() {
-      // Check if guest has local items and user just signed in
+    async function migrateGuestDataToServer(token: string) {
       const stored = localStorage.getItem(LOCAL_WISHLIST_KEY);
       if (!stored) return;
 
       try {
         const guestItems = JSON.parse(stored) as WishlistItem[];
-        
-        // Even if empty, purge to mark as migrated
         if (guestItems.length === 0) {
-          localStorage.removeItem(LOCAL_WISHLIST_KEY);
-          localStorage.removeItem(LOCAL_INCOME_KEY);
+          clearGuestStorage();
           return;
         }
 
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        const token = session?.access_token;
-        if (!token) return;
-
-        // Upload each guest item to server with retry logic
         let successCount = 0;
         let failureCount = 0;
 
         for (const item of guestItems) {
-          let uploaded = false;
-          
-          // Retry up to 3 times with exponential backoff
-          for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-              const res = await fetch("/api/wishlist", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ item }),
-              });
-
-              if (res.ok) {
-                uploaded = true;
-                successCount++;
-                break;
-              } else if (res.status === 409) {
-                // Item already exists (duplicate), mark as success
-                uploaded = true;
-                successCount++;
-                break;
-              } else if (attempt < 2) {
-                // Retry with exponential backoff (100ms, 200ms)
-                await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 100));
-              }
-            } catch (err) {
-              if (attempt < 2) {
-                // Network error, retry
-                await new Promise((r) => setTimeout(r, Math.pow(2, attempt) * 100));
-              }
-            }
-          }
-
-          if (!uploaded) {
-            failureCount++;
-            console.warn(`Failed to migrate item "${item.product.displayName}" after 3 attempts`);
+          const uploaded = await createWishlistItemWithRetry(token, item, [...RETRY_DELAYS_MS]);
+          if (uploaded) {
+            successCount += 1;
+          } else {
+            failureCount += 1;
+            console.warn(`Failed to migrate item "${item.product.displayName}" after retries`);
           }
         }
 
@@ -202,32 +151,55 @@ export default function MainDashboard() {
           `✓ Migration complete: ${successCount}/${guestItems.length} items uploaded` +
           (failureCount > 0 ? `, ${failureCount} failed` : "")
         );
-
-        // IMMEDIATELY purge guest data after migration (success or partial)
-        localStorage.removeItem(LOCAL_WISHLIST_KEY);
-        localStorage.removeItem(LOCAL_INCOME_KEY);
-      } catch (err) {
-        console.warn("Failed to migrate guest data:", err);
+        clearGuestStorage();
+      } catch (error) {
+        console.warn("Failed to migrate guest data:", error);
       }
     }
 
-    load();
+    async function syncWishlistFromServer(token: string) {
+      await migrateGuestDataToServer(token);
+      try {
+        const serverItems = await fetchWishlistItems(token);
+        if (!mounted) return;
+        setItems(serverItems);
+        clearGuestStorage();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn("Failed to load wishlist:", message);
+      }
+    }
+
+    async function load() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!mounted) return;
+      setUser(session?.user ?? null);
+      if (!session?.access_token) return;
+      await syncWishlistFromServer(session.access_token);
+    }
+
+    void load();
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        // Update user state
-        setUser(session.user);
-        // User signed in: migrate guest data first, then load from server
-        migrateGuestDataToServer().then(() => load());
-      } else if (event === 'SIGNED_OUT') {
-        // Only clear items on explicit sign-out, not initial state
-        setUser(null);
+      if (!mounted) return;
+      setUser(session?.user ?? null);
+
+      if (session?.access_token) {
+        void syncWishlistFromServer(session.access_token);
+        return;
+      }
+
+      if (event === "SIGNED_OUT") {
         setItems([]);
-      } else {
-        // Initial state or other events - just update user state
-        setUser(null);
       }
     });
-    return () => sub.subscription.unsubscribe();
+
+    return () => {
+      mounted = false;
+      sub.subscription.unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -252,90 +224,43 @@ export default function MainDashboard() {
     return () => mediaQuery.removeEventListener("change", setDetailsDefault);
   }, []);
 
-  // Load and persist view mode preference
-  useEffect(() => {
-    const stored = localStorage.getItem("borderless-buy-view-mode") as ViewMode | null;
-    if (stored && (stored === "local" || stored === "global")) {
-      setViewMode(stored);
-    }
-  }, []);
-
   const handleViewModeChange = useCallback((mode: ViewMode) => {
     setViewMode(mode);
-    localStorage.setItem("borderless-buy-view-mode", mode);
+    localStorage.setItem(VIEW_MODE_KEY, mode);
+  }, []);
+
+  const rollbackAddedItem = useCallback((id: string) => {
+    setItems((previous) => previous.filter((entry) => entry.id !== id));
+    setSelectedIds((previous) => removeSelectionId(previous, id));
   }, []);
 
   const handleAdd = useCallback(async (item: WishlistItem, prompt?: string) => {
-    // Save current state for rollback if needed
-    const previousItems = items;
-    
-    // Optimistically add locally
-    setItems((prev) => [item, ...prev]);
-    setSelectedIds((prev) => new Set(prev).add(item.id));
+    setItems((previous) => [item, ...previous]);
+    setSelectedIds((previous) => new Set(previous).add(item.id));
     if (prompt) setLastPrompt(prompt);
 
-    // If user is signed in, persist via server endpoint (verifies token)
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) return; // Guest user, item stays in localStorage only
-      
-      const res = await fetch("/api/wishlist", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ item }),
-      });
-      
-      if (!res.ok) {
-        const data = await res.json();
-        // Rollback on error
-        setItems(previousItems);
-        setSelectedIds((prev) => {
-          const next = new Set(prev);
-          next.delete(item.id);
-          return next;
-        });
-        console.warn("Failed to persist wishlist item:", data.error ?? res.statusText);
-      }
-    } catch (err) {
-      // Rollback on error
-      setItems(previousItems);
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        next.delete(item.id);
-        return next;
-      });
-      console.warn("Error saving item to server:", err);
+      const token = await getAccessToken();
+      if (!token) return;
+      await createWishlistItem(token, item);
+    } catch (error) {
+      rollbackAddedItem(item.id);
+      console.warn("Failed to persist wishlist item:", error);
     }
-  }, [items]);
+  }, [rollbackAddedItem]);
 
   const handleRemove = useCallback((id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-    // If user is signed in, delete from server too
+    setSelectedIds((prev) => removeSelectionId(prev, id));
+
     if (user) {
       (async () => {
         try {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          const token = session?.access_token;
+          const token = await getAccessToken();
           if (!token) return;
-          const res = await fetch(`/api/wishlist?id=${id}`, {
-            method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (!res.ok) {
-            console.warn("Failed to delete item from server:", res.statusText);
-          }
-        } catch (err) {
-          console.warn("Error deleting item from server:", err);
+          await deleteWishlistItem(token, id);
+        } catch (error) {
+          console.warn("Error deleting item from server:", error);
         }
       })();
     }
@@ -357,24 +282,11 @@ export default function MainDashboard() {
 
     if (!user) return;
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      const token = await getAccessToken();
       if (!token) return;
-
-      const res = await fetch("/api/wishlist", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ id, tag }),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        console.warn("Failed to update tag:", data.error ?? res.statusText);
-      }
-    } catch (err) {
-      console.warn("Error updating tag:", err);
+      await updateWishlistTag(token, id, tag);
+    } catch (error) {
+      console.warn("Error updating tag:", error);
     }
   }, [user]);
 
@@ -389,8 +301,8 @@ export default function MainDashboard() {
   // Validate and sanitize income input
   const handleIncomeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
-    // Allow empty or valid positive numbers up to 99,999,999
-    if (val === "" || (/^\d+(\.\d{0,2})?$/.test(val) && Number(val) <= 99999999)) {
+    // Allow empty or valid positive numbers up to the configured max.
+    if (val === "" || (/^\d+(\.\d{0,2})?$/.test(val) && Number(val) <= MAX_INCOME_VALUE)) {
       setIncomeInput(val);
     }
   }, []);
@@ -401,20 +313,13 @@ export default function MainDashboard() {
     if (user) return;
     try {
       localStorage.setItem(LOCAL_WISHLIST_KEY, JSON.stringify(items));
-    } catch (err: any) {
+    } catch (error) {
       // Check if it's a quota error
-      if (err?.name === "QuotaExceededError") {
+      if (error instanceof DOMException && error.name === "QuotaExceededError") {
         console.error("localStorage quota exceeded");
       }
     }
   }, [items, user]);
-
-  useEffect(() => {
-    if (!hasLoadedFromStorage.current) return;
-    if (items.length === 0) return;
-    const currentIds = new Set(items.map((item) => item.id));
-    setSelectedIds((prev) => new Set(Array.from(prev).filter((id) => currentIds.has(id))));
-  }, [items]);
 
   // Persist income preference for guests
   useEffect(() => {
@@ -475,10 +380,15 @@ export default function MainDashboard() {
     return () => window.removeEventListener("storage", handleStorageChange);
   }, [user]);
 
+  const effectiveSelectedIds = useMemo(() => {
+    const currentItemIds = new Set(items.map((item) => item.id));
+    return new Set(Array.from(selectedIds).filter((id) => currentItemIds.has(id)));
+  }, [items, selectedIds]);
+
   useEffect(() => {
     if (!hasLoadedFromStorage.current) return;
     try {
-      const selectedArray = Array.from(selectedIds);
+      const selectedArray = Array.from(effectiveSelectedIds);
       if (selectedArray.length > 0) {
         localStorage.setItem(LOCAL_SELECTED_KEY, JSON.stringify(selectedArray));
       } else {
@@ -487,7 +397,7 @@ export default function MainDashboard() {
     } catch {
       // If storage fails, silently skip.
     }
-  }, [selectedIds]);
+  }, [effectiveSelectedIds]);
 
   const availableTags = useMemo(() => {
     const tags = new Set<string>();
@@ -498,15 +408,11 @@ export default function MainDashboard() {
     return Array.from(tags).sort((a, b) => a.localeCompare(b));
   }, [items]);
 
-  const displayItems = selectedTag
-    ? items.filter((item) => item.tag?.trim() === selectedTag)
-    : items;
+  const effectiveSelectedTag = selectedTag && availableTags.includes(selectedTag) ? selectedTag : null;
 
-  useEffect(() => {
-    if (selectedTag && !availableTags.includes(selectedTag)) {
-      setSelectedTag(null);
-    }
-  }, [availableTags, selectedTag]);
+  const displayItems = effectiveSelectedTag
+    ? items.filter((item) => item.tag?.trim() === effectiveSelectedTag)
+    : items;
 
   const selectAll = useCallback(() => {
     setSelectedIds(new Set(displayItems.map((i) => i.id)));
@@ -516,84 +422,38 @@ export default function MainDashboard() {
     setSelectedIds(new Set());
   }, []);
 
-  const selectedItems = displayItems.filter((i) => selectedIds.has(i.id));
-  const itemsForTotals = selectedTag ? displayItems : selectedItems;
+  const selectedItems = displayItems.filter((item) => effectiveSelectedIds.has(item.id));
+  const itemsForTotals = effectiveSelectedTag ? displayItems : selectedItems;
   const chartItems = itemsForTotals;
 
-  const coverageThreshold = 0.8;
-  const totalItems = itemsForTotals.length;
-  const totalsByCountry = COUNTRY_CODES.map((code) => {
-    let count = 0;
-    const total = itemsForTotals.reduce((sum, item) => {
-      const p = item.product.pricing[code];
-      if (!p || p.price === null) return sum;
-      count += 1;
-      return sum + convertToPreferred(p.price, p.currency);
-    }, 0);
-    return { code, label: COUNTRY_LABELS[code], total, count };
-  });
-  const itemsByCountry = COUNTRY_CODES.map((code) => {
-    const entries = itemsForTotals
-      .map((item) => {
-        const p = item.product.pricing[code];
-        if (!p || p.price === null) return null;
-        return {
-          id: item.id,
-          name: item.product.displayName,
-          converted: convertToPreferred(p.price, p.currency),
-          priceSource: p.priceSource,
-          buyingLink: p.buyingLink,
-        };
-      })
-      .filter(Boolean) as Array<{
-      id: string;
-      name: string;
-      converted: number;
-      priceSource?: string;
-      buyingLink?: string;
-    }>;
-
-    return { code, label: COUNTRY_LABELS[code], items: entries };
-  }).filter((entry) => entry.items.length > 0);
-  const eligibleTotals = totalsByCountry.filter((t) =>
-    totalItems > 0 && t.total > 0 && t.count / totalItems >= coverageThreshold
+  const marketSummary = useMemo(
+    () =>
+      buildMarketSummary({
+        itemsForTotals,
+        preferredCountry,
+        selectedBestCode: null,
+        selectedCompareCode,
+        convertToPreferred,
+      }),
+    [itemsForTotals, preferredCountry, selectedCompareCode, convertToPreferred]
   );
-  const totalsForRanking = eligibleTotals.length > 0
-    ? eligibleTotals
-    : totalsByCountry.filter((t) => t.total > 0);
-  const bestMarket = totalsForRanking.reduce(
-    (best, t) => (t.total > 0 && (!best || t.total < best.total) ? t : best),
-    null as { code: string; label: string; total: number; count: number } | null
-  );
-  const bestTotal = bestMarket?.total ?? 0;
-  const homeTotal = totalsByCountry.find((t) => t.code === preferredCountry)?.total ?? 0;
-  const potentialSavings = bestTotal > 0 && homeTotal > 0 ? homeTotal - bestTotal : null;
-  const eligibleMarketCodes = eligibleTotals.map((entry) => entry.code);
-  const marketList = eligibleMarketCodes.length > 0
-    ? itemsByCountry.filter((entry) => eligibleMarketCodes.includes(entry.code as keyof typeof COUNTRY_LABELS))
-    : itemsByCountry;
-  const availableMarketCodes = marketList.map((entry) => entry.code);
-  const effectiveBestCode = selectedBestCode && availableMarketCodes.includes(selectedBestCode as keyof typeof COUNTRY_LABELS)
-    ? selectedBestCode
-    : bestMarket?.code ?? preferredCountry;
-  const effectiveCompareCode = selectedCompareCode && availableMarketCodes.includes(selectedCompareCode as keyof typeof COUNTRY_LABELS)
-    ? selectedCompareCode
-    : preferredCountry;
-  const effectiveBestMarket = totalsByCountry.find((t) => t.code === effectiveBestCode) ?? null;
-  const effectiveCompareMarket = totalsByCountry.find((t) => t.code === effectiveCompareCode) ?? null;
-  const compareTotal = effectiveCompareMarket?.total ?? 0;
-  const compareSavings = bestTotal > 0 && compareTotal > 0 ? compareTotal - bestTotal : null;
-  const bestItems = itemsByCountry.find((entry) => entry.code === effectiveBestCode)?.items ?? [];
-  const compareItems = itemsByCountry.find((entry) => entry.code === effectiveCompareCode)?.items ?? [];
+  const {
+    totalItems,
+    totalsByCountry,
+    bestMarket,
+    bestTotal,
+    potentialSavings,
+    marketList,
+    effectiveBestCode,
+    effectiveCompareCode,
+    effectiveBestMarket,
+    effectiveCompareMarket,
+    compareTotal,
+    compareSavings,
+    bestItems,
+    compareItems,
+  } = marketSummary;
 
-  useEffect(() => {
-    if (!bestMarket) return;
-    if (!selectedBestCode) setSelectedBestCode(bestMarket.code);
-  }, [bestMarket, selectedBestCode]);
-
-  useEffect(() => {
-    if (!selectedCompareCode) setSelectedCompareCode(preferredCountry);
-  }, [preferredCountry, selectedCompareCode]);
   const showTotals = itemsForTotals.length > 0;
 
   useEffect(() => {
@@ -629,7 +489,7 @@ export default function MainDashboard() {
             <button
               type="button"
               onClick={() => setShowPromptModal(true)}
-              className="hidden sm:flex shrink-0 rounded-full p-2 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-secondary)]\"
+              className="hidden sm:flex shrink-0 rounded-full p-2 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-secondary)]"
               title="View last Gemini prompt"
               aria-label="View last Gemini prompt"
             >
@@ -731,7 +591,7 @@ export default function MainDashboard() {
                   type="number"
                   inputMode="decimal"
                   min="0"
-                  max="99999999"
+                  max={MAX_INCOME_VALUE}
                   placeholder="0"
                   value={incomeInput}
                   onChange={handleIncomeChange}
@@ -800,8 +660,8 @@ export default function MainDashboard() {
               onClick={() => setSelectedTag(null)}
               className="text-xs rounded-full px-3 py-1 transition-colors"
               style={{
-                backgroundColor: selectedTag ? 'var(--bg-secondary)' : 'var(--accent-primary)',
-                color: selectedTag ? 'var(--text-secondary)' : 'white',
+                backgroundColor: effectiveSelectedTag ? "var(--bg-secondary)" : "var(--accent-primary)",
+                color: effectiveSelectedTag ? "var(--text-secondary)" : "white",
               }}
             >
               All
@@ -813,8 +673,8 @@ export default function MainDashboard() {
                 onClick={() => setSelectedTag(tag)}
                 className="text-xs rounded-full px-3 py-1 transition-colors"
                 style={{
-                  backgroundColor: selectedTag === tag ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-                  color: selectedTag === tag ? 'white' : 'var(--text-secondary)',
+                  backgroundColor: effectiveSelectedTag === tag ? "var(--accent-primary)" : "var(--bg-secondary)",
+                  color: effectiveSelectedTag === tag ? "white" : "var(--text-secondary)",
                 }}
               >
                 #{tag}
@@ -868,7 +728,7 @@ export default function MainDashboard() {
               <li key={item.id} className="min-w-0">
                 <WishlistCard
                   item={item}
-                  selected={selectedIds.has(item.id)}
+                  selected={effectiveSelectedIds.has(item.id)}
                   onToggleSelect={handleToggleSelect}
                   onRemove={handleRemove}
                   viewMode={viewMode}
@@ -1002,45 +862,11 @@ export default function MainDashboard() {
                         View items in {effectiveBestMarket?.label ?? "best market"}
                       </summary>
                       <div className="mt-3 space-y-3">
-                        {bestItems.length === 0 && (
-                          <div className="text-xs" style={{color: 'var(--text-tertiary)'}}>
-                            No items available for this market.
-                          </div>
-                        )}
-                        {bestItems.map((item) => (
-                          <div
-                            key={`${effectiveBestCode}-${item.id}`}
-                            className="flex items-start justify-between gap-3 border-b pb-3 last:border-b-0 last:pb-0"
-                            style={{borderColor: 'var(--border-primary)'}}
-                          >
-                            <div className="min-w-0">
-                              <div className="text-sm font-medium truncate" style={{color: 'var(--text-secondary)'}} title={item.name}>
-                                {item.name}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-sm font-semibold" style={{color: 'var(--text-primary)'}}>
-                                {formatCurrency(item.converted, preferredCurrency, { maxFractionDigits: 0 })}
-                              </div>
-                              {item.buyingLink && (
-                                <a
-                                  href={item.buyingLink}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="mt-0.5 inline-flex items-center gap-1 text-xs"
-                                  style={{color: 'var(--accent-primary)'}}
-                                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
-                                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
-                                >
-                                  <span className="max-w-[110px] truncate">
-                                    {item.priceSource ?? "Buy"}
-                                  </span>
-                                  <span aria-hidden>↗</span>
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                        <MarketItemsList
+                          marketCode={effectiveBestCode}
+                          items={bestItems}
+                          preferredCurrency={preferredCurrency}
+                        />
                       </div>
                     </details>
                   </div>
@@ -1062,7 +888,7 @@ export default function MainDashboard() {
                       </div>
                       <select
                         value={effectiveCompareCode ?? ""}
-                        onChange={(e) => setSelectedCompareCode(e.target.value)}
+                        onChange={(e) => setSelectedCompareCode(e.target.value as CountryCode)}
                         className="rounded-md border px-2 py-1 text-xs sm:text-sm"
                         style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-secondary)'}}
                       >
@@ -1090,48 +916,14 @@ export default function MainDashboard() {
                       onToggle={(e) => setExpandHome((e.target as HTMLDetailsElement).open)}
                     >
                       <summary className="cursor-pointer text-xs sm:text-sm font-medium" style={{color: 'var(--text-secondary)'}}>
-                        View items in {COUNTRY_LABELS[effectiveCompareCode as keyof typeof COUNTRY_LABELS]}
+                        View items in {COUNTRY_LABELS[effectiveCompareCode]}
                       </summary>
                       <div className="mt-3 space-y-3">
-                        {compareItems.length === 0 && (
-                          <div className="text-xs" style={{color: 'var(--text-tertiary)'}}>
-                            No items available for this market.
-                          </div>
-                        )}
-                        {compareItems.map((item) => (
-                          <div
-                            key={`${effectiveCompareCode}-${item.id}`}
-                            className="flex items-start justify-between gap-3 border-b pb-3 last:border-b-0 last:pb-0"
-                            style={{borderColor: 'var(--border-primary)'}}
-                          >
-                            <div className="min-w-0">
-                              <div className="text-sm font-medium truncate" style={{color: 'var(--text-secondary)'}} title={item.name}>
-                                {item.name}
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-sm font-semibold" style={{color: 'var(--text-primary)'}}>
-                                {formatCurrency(item.converted, preferredCurrency, { maxFractionDigits: 0 })}
-                              </div>
-                              {item.buyingLink && (
-                                <a
-                                  href={item.buyingLink}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="mt-0.5 inline-flex items-center gap-1 text-xs"
-                                  style={{color: 'var(--accent-primary)'}}
-                                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-hover)'}
-                                  onMouseLeave={(e) => e.currentTarget.style.color = 'var(--accent-primary)'}
-                                >
-                                  <span className="max-w-[110px] truncate">
-                                    {item.priceSource ?? "Buy"}
-                                  </span>
-                                  <span aria-hidden>↗</span>
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                        <MarketItemsList
+                          marketCode={effectiveCompareCode}
+                          items={compareItems}
+                          preferredCurrency={preferredCurrency}
+                        />
                       </div>
                     </details>
                   </div>
