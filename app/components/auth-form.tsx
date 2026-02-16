@@ -37,9 +37,9 @@ export function AuthForm({ onUserChange }: { onUserChange?: (user: any) => void 
     setMessage(null);
     setLoading(true);
     try {
-      const redirectUrl = typeof window !== 'undefined' 
-        ? `${window.location.origin}/api/auth/callback` 
-        : undefined;
+      const redirectUrl = globalThis.location === undefined
+        ? undefined
+        : `${globalThis.location.origin}/api/auth/callback`;
       
       const { error } = await supabase.auth.signInWithOtp({ 
         email,

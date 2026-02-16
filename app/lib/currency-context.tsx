@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useState,
+  useMemo,
   useCallback,
   useEffect,
   type ReactNode,
@@ -39,15 +40,26 @@ const CurrencyContext = createContext<CurrencyContextValue | null>(null);
 const STORAGE_KEY = PREFERRED_CURRENCY_KEY;
 const DEFAULT_COUNTRY: CountryCode = "US";
 
-export function CurrencyProvider({ children }: { children: ReactNode }) {
-  const [preferredCountry, setPreferredCountryState] =
-    useState<CountryCode>(DEFAULT_COUNTRY);
+function readStoredPreferredCountry(): CountryCode | null {
+  if (!("localStorage" in globalThis)) {
+    return null;
+  }
+  const stored = globalThis.localStorage.getItem(STORAGE_KEY);
+  if (!stored || !COUNTRY_CODES.includes(stored as CountryCode)) {
+    return null;
+  }
+  return stored as CountryCode;
+}
+
+export function CurrencyProvider({ children }: Readonly<{ children: ReactNode }>) {
+  const [preferredCountry, setPreferredCountry] = useState<CountryCode>(
+    () => readStoredPreferredCountry() ?? DEFAULT_COUNTRY
+  );
   const [rates, setRates] = useState<RatesState>(defaultRates);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY) as CountryCode | null;
-    if (stored && COUNTRY_CODES.includes(stored)) {
-      setPreferredCountryState(stored);
+    const storedPreferredCountry = readStoredPreferredCountry();
+    if (storedPreferredCountry) {
       return;
     }
 
@@ -71,7 +83,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         };
         const detected = countryMap[countryCode];
         if (detected) {
-          setPreferredCountryState(detected);
+          setPreferredCountry(detected);
         }
       })
       .catch(() => {
@@ -79,9 +91,11 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
-  const setPreferredCountry = useCallback((c: CountryCode) => {
-    setPreferredCountryState(c);
-    localStorage.setItem(STORAGE_KEY, c);
+  const setPreferredCountryWithPersistence = useCallback((country: CountryCode) => {
+    setPreferredCountry(country);
+    if ("localStorage" in globalThis) {
+      globalThis.localStorage.setItem(STORAGE_KEY, country);
+    }
   }, []);
 
   useEffect(() => {
@@ -123,14 +137,23 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     [convertToPreferred, preferredCountry]
   );
 
-  const value: CurrencyContextValue = {
-    preferredCountry,
-    preferredCurrency: COUNTRY_CURRENCY[preferredCountry],
-    setPreferredCountry,
-    rates,
-    convertToPreferred,
-    formatInPreferred,
-  };
+  const value = useMemo<CurrencyContextValue>(
+    () => ({
+      preferredCountry,
+      preferredCurrency: COUNTRY_CURRENCY[preferredCountry],
+      setPreferredCountry: setPreferredCountryWithPersistence,
+      rates,
+      convertToPreferred,
+      formatInPreferred,
+    }),
+    [
+      preferredCountry,
+      setPreferredCountryWithPersistence,
+      rates,
+      convertToPreferred,
+      formatInPreferred,
+    ]
+  );
 
   return (
     <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>

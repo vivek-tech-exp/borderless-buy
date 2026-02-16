@@ -16,7 +16,7 @@ interface MarketItemsListProps {
   preferredCurrency: string;
 }
 
-export function MarketItemsList({ marketCode, items, preferredCurrency }: MarketItemsListProps) {
+export function MarketItemsList({ marketCode, items, preferredCurrency }: Readonly<MarketItemsListProps>) {
   if (items.length === 0) {
     return (
       <div className="text-xs" style={{ color: "var(--text-tertiary)" }}>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { LightBulbIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
 import type { WishlistItem } from "@/types";
@@ -10,7 +9,7 @@ interface AddItemFormProps {
   onAdd: (item: WishlistItem, prompt?: string) => void;
 }
 
-export function AddItemForm({ onAdd }: AddItemFormProps) {
+export function AddItemForm({ onAdd }: Readonly<AddItemFormProps>) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

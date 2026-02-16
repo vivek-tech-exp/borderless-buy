@@ -9,17 +9,82 @@ import {
 } from "recharts";
 import type { SectorProps } from "recharts";
 import { useEffect, useRef, useState } from "react";
-import type { WishlistItem } from "@/types";
+import type { CountryCode, WishlistItem } from "@/types";
 import { COUNTRY_CODES, COUNTRY_LABELS } from "@/types";
 import { useCurrency } from "@/app/lib/currency-context";
 import { ITEM_CHART_COLORS } from "@/app/lib/constants";
 import { formatCurrency } from "@/app/lib/utils";
 
 interface AnalyticsPieProps {
-  items: WishlistItem[];
+  readonly items: ReadonlyArray<WishlistItem>;
 }
 
-export function AnalyticsPie({ items }: AnalyticsPieProps) {
+type ProductBestEntry = {
+  code: CountryCode;
+  converted: number;
+  original: {
+    buyingLink: string;
+  };
+};
+
+type ProductData = {
+  id: string;
+  name: string;
+  bestCountry: CountryCode;
+  bestCountryLabel: string;
+  bestBuyingLink: string;
+  bestValue: number;
+  homeValue: number | null;
+};
+
+type PanelAnchor = {
+  x: number;
+  y: number;
+};
+
+type PointerLikeEvent = {
+  clientX?: number;
+  clientY?: number;
+};
+
+function roundCurrency(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function renderActiveSector(props: SectorProps) {
+  return <Sector {...props} outerRadius={(props.outerRadius ?? 100) + 8} />;
+}
+
+function getPanelCoordinates(
+  panelAnchor: PanelAnchor,
+  chartRect: DOMRect,
+  panelSize: { width: number; height: number }
+): { left: number; top: number } {
+  const padding = 8;
+  const offsetX = 16;
+  const offsetY = 12;
+  const rawLeft = panelAnchor.x + offsetX;
+  const above = panelAnchor.y - panelSize.height - offsetY;
+  const below = panelAnchor.y + offsetY;
+  const rawTop = above >= padding ? above : below;
+
+  return {
+    left: Math.min(Math.max(rawLeft, padding), chartRect.width - panelSize.width - padding),
+    top: Math.min(Math.max(rawTop, padding), chartRect.height - panelSize.height - padding),
+  };
+}
+
+function toPointerLikeEvent(event: unknown): PointerLikeEvent | null {
+  if (!event || typeof event !== "object") {
+    return null;
+  }
+  const pointerEvent = event as PointerLikeEvent;
+  return typeof pointerEvent.clientX === "number" || typeof pointerEvent.clientY === "number"
+    ? pointerEvent
+    : null;
+}
+
+export function AnalyticsPie({ items }: Readonly<AnalyticsPieProps>) {
   const { convertToPreferred, preferredCountry, preferredCurrency } = useCurrency();
 
   const chartRef = useRef<HTMLDivElement | null>(null);
@@ -28,38 +93,37 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
   // Build data per product: choose the best country (min converted price) for each product
   const productsData = items
     .map((item) => {
-      const entries = COUNTRY_CODES.map((code) => {
+      const entries = COUNTRY_CODES.reduce<ProductBestEntry[]>((accumulator, code) => {
         const p = item.product.pricing[code];
-        if (!p || p.price === null) return null;
+        if (p?.price == null) return accumulator;
         const converted = convertToPreferred(p.price, p.currency);
-        return { code, converted, original: p } as const;
-      }).filter(Boolean) as Array<{ code: string; converted: number; original: any }>; // keep simple
+        accumulator.push({ code, converted, original: p });
+        return accumulator;
+      }, []);
 
       if (entries.length === 0) return null;
 
-      const best = entries.reduce((a, b) => (a.converted <= b.converted ? a : b));
+      const best = entries.reduce(
+        (a, b) => (a.converted <= b.converted ? a : b),
+        entries[0]
+      );
       const homeEntry = item.product.pricing[preferredCountry];
-      const homeConverted = homeEntry && homeEntry.price !== null ? convertToPreferred(homeEntry.price, homeEntry.currency) : null;
+      const homeConverted =
+        homeEntry?.price == null
+          ? null
+          : convertToPreferred(homeEntry.price, homeEntry.currency);
 
       return {
         id: item.id,
         name: item.product.displayName,
         bestCountry: best.code,
-        bestCountryLabel: COUNTRY_LABELS[best.code as keyof typeof COUNTRY_LABELS],
+        bestCountryLabel: COUNTRY_LABELS[best.code],
         bestBuyingLink: best.original?.buyingLink,
-        bestValue: Math.round(best.converted * 100) / 100,
-        homeValue: homeConverted != null ? Math.round(homeConverted * 100) / 100 : null,
+        bestValue: roundCurrency(best.converted),
+        homeValue: homeConverted === null ? null : roundCurrency(homeConverted),
       };
     })
-    .filter(Boolean) as Array<{
-      id: string;
-      name: string;
-      bestCountry: string;
-      bestCountryLabel: string;
-      bestBuyingLink?: string;
-      bestValue: number;
-      homeValue: number | null;
-    }>;
+    .filter((entry): entry is ProductData => entry !== null);
 
   const itemColorPalette = [
     "#3b82f6",
@@ -77,7 +141,7 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
   const getItemColor = (seed: string) => {
     let hash = 5381;
     for (let i = 0; i < seed.length; i += 1) {
-      hash = (hash * 33) ^ seed.charCodeAt(i);
+      hash = (hash * 33) ^ (seed.codePointAt(i) ?? 0);
     }
     const index = Math.abs(hash) % itemColorPalette.length;
     return itemColorPalette[index];
@@ -94,13 +158,9 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
 
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [lockedIndex, setLockedIndex] = useState<number | null>(null);
-  const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(null);
+  const [panelPos, setPanelPos] = useState<PanelAnchor | null>(null);
   const [panelSize, setPanelSize] = useState<{ width: number; height: number }>({ width: 240, height: 120 });
-
-  useEffect(() => {
-    if (hoveredIndex != null && hoveredIndex >= data.length) setHoveredIndex(null);
-    if (lockedIndex != null && lockedIndex >= data.length) setLockedIndex(null);
-  }, [data.length, hoveredIndex, lockedIndex]);
+  const [panelCoordinates, setPanelCoordinates] = useState<{ left: number; top: number } | null>(null);
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -114,24 +174,41 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  const activeIndex = lockedIndex ?? hoveredIndex;
-  const activeEntry = activeIndex != null ? data[activeIndex] : null;
+  const safeHoveredIndex =
+    hoveredIndex != null && hoveredIndex < data.length ? hoveredIndex : null;
+  const safeLockedIndex =
+    lockedIndex != null && lockedIndex < data.length ? lockedIndex : null;
+  const activeIndex = safeLockedIndex ?? safeHoveredIndex;
+  const activeEntry = activeIndex === null ? null : data[activeIndex];
 
-  const updatePanelPosition = (event?: { clientX?: number; clientY?: number }) => {
+  const refreshPanelCoordinates = (anchor: PanelAnchor) => {
+    if (!chartRef.current) return;
+    const chartRect = chartRef.current.getBoundingClientRect();
+    setPanelCoordinates(getPanelCoordinates(anchor, chartRect, panelSize));
+  };
+
+  const updatePanelPosition = (event: PointerLikeEvent | null) => {
     if (!chartRef.current || !event) return;
     const rect = chartRef.current.getBoundingClientRect();
     const x = (event.clientX ?? 0) - rect.left;
     const y = (event.clientY ?? 0) - rect.top;
-    setPanelPos({ x, y });
+    const anchor = { x, y };
+    setPanelPos(anchor);
+    refreshPanelCoordinates(anchor);
   };
 
   useEffect(() => {
     if (!panelRef.current) return;
     const rect = panelRef.current.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
-      setPanelSize({ width: rect.width, height: rect.height });
+      const nextPanelSize = { width: rect.width, height: rect.height };
+      setPanelSize(nextPanelSize);
+      if (panelPos && chartRef.current) {
+        const chartRect = chartRef.current.getBoundingClientRect();
+        setPanelCoordinates(getPanelCoordinates(panelPos, chartRect, nextPanelSize));
+      }
     }
-  }, [activeEntry]);
+  }, [activeEntry, panelPos]);
 
   const optimizedTotal = productsData.reduce((s, p) => s + p.bestValue, 0);
   const homeTotal = productsData.reduce((s, p) => s + (p.homeValue ?? p.bestValue), 0);
@@ -161,35 +238,14 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
         className="relative h-[320px] w-full py-2"
         ref={chartRef}
         style={{ outline: "none" }}
-        onMouseDown={(e) => e.preventDefault()}
       >
-        {activeEntry && panelPos && chartRef.current && (
+        {activeEntry && panelPos && panelCoordinates && (
           <div
             ref={panelRef}
             className="pointer-events-auto absolute z-20 rounded-lg border px-3 py-2 shadow-xl"
             style={{
-              left: (() => {
-                const chartRect = chartRef.current!.getBoundingClientRect();
-                const padding = 8;
-                const offsetX = 16;
-                const rawLeft = panelPos.x + offsetX;
-                return Math.min(
-                  Math.max(rawLeft, padding),
-                  chartRect.width - panelSize.width - padding
-                );
-              })(),
-              top: (() => {
-                const chartRect = chartRef.current!.getBoundingClientRect();
-                const padding = 8;
-                const offsetY = 12;
-                const above = panelPos.y - panelSize.height - offsetY;
-                const below = panelPos.y + offsetY;
-                const rawTop = above >= padding ? above : below;
-                return Math.min(
-                  Math.max(rawTop, padding),
-                  chartRect.height - panelSize.height - padding
-                );
-              })(),
+              left: panelCoordinates.left,
+              top: panelCoordinates.top,
               backgroundColor: 'var(--bg-secondary)',
               borderColor: 'var(--border-primary)',
               color: 'var(--text-primary)',
@@ -252,20 +308,15 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
               dataKey="value"
               nameKey="name"
               activeIndex={activeIndex ?? undefined}
-              activeShape={(props: SectorProps) => (
-                <Sector
-                  {...props}
-                  outerRadius={(props.outerRadius ?? 100) + 8}
-                />
-              )}
+              activeShape={renderActiveSector}
               onMouseEnter={(_, index, event) => {
                 if (lockedIndex == null) {
                   setHoveredIndex(index);
-                  updatePanelPosition(event as any);
+                  updatePanelPosition(toPointerLikeEvent(event));
                 }
               }}
               onMouseMove={(_, __, event) => {
-                if (lockedIndex == null) updatePanelPosition(event as any);
+                if (lockedIndex == null) updatePanelPosition(toPointerLikeEvent(event));
               }}
               onMouseLeave={() => {
                 if (lockedIndex == null) setHoveredIndex(null);
@@ -273,7 +324,7 @@ export function AnalyticsPie({ items }: AnalyticsPieProps) {
               onClick={(_, index, event) => {
                 setLockedIndex((prev) => (prev === index ? null : index));
                 setHoveredIndex((prev) => (prev === index ? null : index));
-                updatePanelPosition(event as any);
+                updatePanelPosition(toPointerLikeEvent(event));
               }}
             >
               {data.map((entry) => (

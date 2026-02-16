@@ -10,7 +10,7 @@ interface SignInModalProps {
   onUserChange?: (user: any) => void;
 }
 
-export function SignInModal({ isOpen, onClose, onUserChange }: SignInModalProps) {
+export function SignInModal({ isOpen, onClose, onUserChange }: Readonly<SignInModalProps>) {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -70,9 +70,9 @@ export function SignInModal({ isOpen, onClose, onUserChange }: SignInModalProps)
     setMessage(null);
     setLoading(true);
     try {
-      const redirectUrl = typeof window !== 'undefined' 
-        ? `${window.location.origin}/api/auth/callback` 
-        : undefined;
+      const redirectUrl = globalThis.location === undefined
+        ? undefined
+        : `${globalThis.location.origin}/api/auth/callback`;
       
       const { error } = await supabase.auth.signInWithOtp({ 
         email,
@@ -101,10 +101,12 @@ export function SignInModal({ isOpen, onClose, onUserChange }: SignInModalProps)
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div
+      <button
+        type="button"
         className="absolute inset-0 backdrop-blur-sm transition-opacity duration-200"
         style={{backgroundColor: 'var(--overlay)'}}
         onClick={onClose}
+        aria-label="Close sign-in modal"
       />
 
       {/* Modal */}
@@ -124,7 +126,7 @@ export function SignInModal({ isOpen, onClose, onUserChange }: SignInModalProps)
           // Signed in state
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-xl font-semibold mb-2" style={{color: 'var(--text-primary)'}}>You're signed in!</h2>
+              <h2 className="text-xl font-semibold mb-2" style={{color: 'var(--text-primary)'}}>You&apos;re signed in!</h2>
               <p className="text-sm" style={{color: 'var(--text-secondary)'}}>Your wishlist is now saved forever.</p>
             </div>
             <div className="flex items-center gap-3 p-4 rounded-[12px] border" style={{backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)'}}>
@@ -157,7 +159,7 @@ export function SignInModal({ isOpen, onClose, onUserChange }: SignInModalProps)
             <div>
               <h2 className="text-xl font-semibold mb-2" style={{color: 'var(--text-primary)'}}>Sign in to save your list</h2>
               <p className="text-sm" style={{color: 'var(--text-secondary)'}}>
-                Enter your email below. We'll send you a magic link—click it to verify and you'll be signed in automatically. No password needed!
+                Enter your email below. We&apos;ll send you a magic link—click it to verify and you&apos;ll be signed in automatically. No password needed!
               </p>
             </div>
 

@@ -6,7 +6,7 @@ import { BasePricingEngine } from "./base";
  * Ready for integration.
  */
 export class OpenAIPricingEngine extends BasePricingEngine {
-  private apiKey: string;
+  private readonly apiKey: string;
 
   constructor(apiKey: string) {
     super();
@@ -20,23 +20,10 @@ export class OpenAIPricingEngine extends BasePricingEngine {
     query: string
   ): Promise<{ product: Product; prompt: string } | { error: string; prompt: string } | null> {
     this.error("OpenAI engine not yet implemented. Please use Gemini or Perplexity.");
+    this.log("OpenAI engine stub invoked", {
+      query,
+      hasApiKey: this.apiKey.length > 0,
+    });
     return null;
-    
-    // TODO: Implement OpenAI integration
-    // const prompt = this.buildPrompt(query);
-    // const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    //   method: "POST",
-    //   headers: {
-    //     "Authorization": `Bearer ${this.apiKey}`,
-    //     "Content-Type": "application/json",
-    //   },
-    //   body: JSON.stringify({
-    //     model: "gpt-4o",
-    //     messages: [{ role: "user", content: prompt }],
-    //     temperature: 0.7,
-    //     response_format: { type: "json_object" },
-    //   }),
-    // });
-    // // ... parse response
   }
 }

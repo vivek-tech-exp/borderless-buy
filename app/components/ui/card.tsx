@@ -1,4 +1,4 @@
-import { forwardRef, type HTMLAttributes } from "react";
+import { forwardRef, type ComponentPropsWithoutRef, type HTMLAttributes } from "react";
 
 const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className = "", ...props }, ref) => (
@@ -23,14 +23,16 @@ const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
 );
 CardHeader.displayName = "CardHeader";
 
-const CardTitle = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLHeadingElement>>(
-  ({ className = "", ...props }, ref) => (
+const CardTitle = forwardRef<HTMLHeadingElement, ComponentPropsWithoutRef<"h3">>(
+  ({ className = "", children, ...props }, ref) => (
     <h3
       ref={ref}
       className={`text-base font-semibold leading-tight tracking-tight ${className}`}
       style={{ color: 'var(--text-primary)' }}
       {...props}
-    />
+    >
+      {children}
+    </h3>
   )
 );
 CardTitle.displayName = "CardTitle";

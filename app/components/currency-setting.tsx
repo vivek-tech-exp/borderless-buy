@@ -5,7 +5,7 @@ import type { CountryCode } from "@/types";
 import { COUNTRY_CODES, COUNTRY_LABELS, COUNTRY_CURRENCY } from "@/types";
 
 export function CurrencySetting() {
-  const { preferredCountry, setPreferredCountry, rates } = useCurrency();
+  const { preferredCountry, setPreferredCountry } = useCurrency();
 
   return (
     <select

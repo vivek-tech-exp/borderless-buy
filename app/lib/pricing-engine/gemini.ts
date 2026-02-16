@@ -1,19 +1,26 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import type { Product } from "@/types";
+import type { CountryPricing, Product } from "@/types";
 import { COUNTRY_CODES } from "@/types";
 import { BasePricingEngine } from "./base";
+
+const VALID_STOCK_STATUSES = new Set<NonNullable<CountryPricing["stockStatus"]>>([
+  "in_stock",
+  "out_of_stock",
+  "preorder",
+  "unknown",
+]);
 
 /**
  * Gemini-based pricing engine using Google's Generative AI API.
  */
 export class GeminiPricingEngine extends BasePricingEngine {
-  private genAI: GoogleGenerativeAI;
-  private models = [
+  private readonly genAI: GoogleGenerativeAI;
+  private readonly models = [
     "gemini-3.0-flash",      // Best & Fresh Quota
     "gemini-3.5-flash",      // Best & Fresh Quota
     "gemini-2.5-flash-lite", // Backup: Fast & Fresh Quota
     "gemini-2.5-flash",      // Fallback
-  ];
+  ] as const;
 
   constructor(apiKey: string) {
     super();
@@ -153,91 +160,17 @@ If Valid:
     query: string
   ): { product: Product } | { error: string } | null {
     try {
-      if (parsed.status === "error") {
-        const message = typeof parsed.message === "string" && parsed.message.trim().length > 0
-          ? parsed.message
-          : "Query is not a valid product.";
-        return { error: message };
+      const errorResult = this.parseErrorResult(parsed);
+      if (errorResult) {
+        return errorResult;
       }
 
-      const pricingRaw = parsed.pricing as Record<string, unknown> | undefined;
-      const pricing: Product["pricing"] = {};
-
-      if (pricingRaw && typeof pricingRaw === "object") {
-        for (const code of COUNTRY_CODES) {
-          const p = pricingRaw[code] as Record<string, unknown> | undefined;
-          if (p && typeof p === "object") {
-            const price = this.isValidPrice(p.price) ? p.price : null;
-            const buyingLink = this.isValidUrl(p.buyingLink)
-              ? String(p.buyingLink)
-              : "";
-
-            if (
-              typeof p.currency === "string" &&
-              typeof p.priceSource === "string"
-            ) {
-              const notesValue = typeof p.notes === "string" ? p.notes : "";
-              const variantDiff = typeof (p as any).variant_diff === "string" ? (p as any).variant_diff : "";
-              const mergedNotes = notesValue || variantDiff || "";
-              pricing[code] = {
-                price,
-                currency: String(p.currency),
-                priceSource: String(p.priceSource),
-                buyingLink,
-                stockStatus: [
-                  "in_stock",
-                  "out_of_stock",
-                  "preorder",
-                  "unknown",
-                ].includes(String(p.stockStatus))
-                  ? (p.stockStatus as
-                      | "in_stock"
-                      | "out_of_stock"
-                      | "preorder"
-                      | "unknown")
-                  : "unknown",
-                notes: mergedNotes,
-              };
-            }
-          }
-        }
-      }
-
-      const pricingEntries = Object.values(pricing).filter(Boolean);
-      const hasAnySource = pricingEntries.some(
-        (entry) => entry && typeof entry.priceSource === "string" && entry.priceSource.trim().length > 0
-      );
-      const hasAnyPrice = pricingEntries.some(
-        (entry) => entry && typeof entry.price === "number"
-      );
-
-      if (!hasAnyPrice) {
+      const pricing = this.parsePricing(parsed.pricing);
+      if (!this.hasAnyPrice(pricing)) {
         return { error: "No reliable prices found. Try a more specific product." };
       }
 
-      const product: Product = {
-        id: String(parsed.id ?? crypto.randomUUID()),
-        name: String(parsed.name ?? query),
-        displayName: String(
-          parsed.displayName ?? parsed.name ?? query
-        ),
-        category: ["tech", "vehicle", "other"].includes(
-          String(parsed.category)
-        )
-          ? (parsed.category as Product["category"])
-          : "other",
-        carryOnFriendly: Boolean(parsed.carryOnFriendly),
-        baselineConfiguration:
-          typeof parsed.baselineConfiguration === "string"
-            ? parsed.baselineConfiguration
-            : undefined,
-        isVagueQuery: Boolean((parsed as any).is_vague_query),
-        selectionRationale:
-          typeof (parsed as any).selection_rationale === "string"
-            ? (parsed as any).selection_rationale
-            : undefined,
-        pricing,
-      };
+      const product = this.buildProduct(parsed, query, pricing);
 
       this.log("Successfully parsed product response", {
         productName: product.displayName,
@@ -252,5 +185,110 @@ If Valid:
       );
       return null;
     }
+  }
+
+  private parseErrorResult(parsed: Record<string, unknown>): { error: string } | null {
+    if (parsed.status !== "error") {
+      return null;
+    }
+
+    const message =
+      typeof parsed.message === "string" && parsed.message.trim().length > 0
+        ? parsed.message
+        : "Query is not a valid product.";
+    return { error: message };
+  }
+
+  private parsePricing(pricingRaw: unknown): Product["pricing"] {
+    const pricing: Product["pricing"] = {};
+    if (!pricingRaw || typeof pricingRaw !== "object") {
+      return pricing;
+    }
+
+    const pricingMap = pricingRaw as Record<string, unknown>;
+    for (const code of COUNTRY_CODES) {
+      const parsedEntry = this.parsePricingEntry(pricingMap[code]);
+      if (parsedEntry) {
+        pricing[code] = parsedEntry;
+      }
+    }
+    return pricing;
+  }
+
+  private parsePricingEntry(rawEntry: unknown): CountryPricing | null {
+    if (!rawEntry || typeof rawEntry !== "object") {
+      return null;
+    }
+
+    const entry = rawEntry as Record<string, unknown>;
+    if (typeof entry.currency !== "string" || typeof entry.priceSource !== "string") {
+      return null;
+    }
+
+    const price = this.isValidPrice(entry.price) ? entry.price : null;
+    const buyingLink = this.isValidUrl(entry.buyingLink) ? String(entry.buyingLink) : "";
+    const notesValue = typeof entry.notes === "string" ? entry.notes : "";
+    const variantDiff = typeof entry.variant_diff === "string" ? entry.variant_diff : "";
+
+    return {
+      price,
+      currency: entry.currency,
+      priceSource: entry.priceSource,
+      buyingLink,
+      stockStatus: this.parseStockStatus(entry.stockStatus),
+      notes: notesValue || variantDiff || "",
+    };
+  }
+
+  private parseStockStatus(value: unknown): NonNullable<CountryPricing["stockStatus"]> {
+    return VALID_STOCK_STATUSES.has(value as NonNullable<CountryPricing["stockStatus"]>)
+      ? (value as NonNullable<CountryPricing["stockStatus"]>)
+      : "unknown";
+  }
+
+  private hasAnyPrice(pricing: Product["pricing"]): boolean {
+    return Object.values(pricing).some((entry) => typeof entry?.price === "number");
+  }
+
+  private parseCategory(value: unknown): Product["category"] {
+    return value === "tech" || value === "vehicle" || value === "other" ? value : "other";
+  }
+
+  private parseOptionalString(value: unknown): string | undefined {
+    return typeof value === "string" ? value : undefined;
+  }
+
+  private parseNonEmptyString(value: unknown): string | null {
+    return typeof value === "string" && value.trim().length > 0 ? value : null;
+  }
+
+  private parseProductId(value: unknown): string {
+    return this.parseNonEmptyString(value) ?? crypto.randomUUID();
+  }
+
+  private parseProductName(value: unknown, fallback: string): string {
+    return this.parseNonEmptyString(value) ?? fallback;
+  }
+
+  private parseDisplayName(displayName: unknown, name: unknown, fallback: string): string {
+    return this.parseNonEmptyString(displayName) ?? this.parseProductName(name, fallback);
+  }
+
+  private buildProduct(
+    parsed: Record<string, unknown>,
+    query: string,
+    pricing: Product["pricing"]
+  ): Product {
+    return {
+      id: this.parseProductId(parsed.id),
+      name: this.parseProductName(parsed.name, query),
+      displayName: this.parseDisplayName(parsed.displayName, parsed.name, query),
+      category: this.parseCategory(parsed.category),
+      carryOnFriendly: Boolean(parsed.carryOnFriendly),
+      baselineConfiguration: this.parseOptionalString(parsed.baselineConfiguration),
+      isVagueQuery: Boolean(parsed.is_vague_query),
+      selectionRationale: this.parseOptionalString(parsed.selection_rationale),
+      pricing,
+    };
   }
 }

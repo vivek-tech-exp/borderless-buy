@@ -43,9 +43,7 @@ let engineInstance: PricingEngine | null = null;
  * Get the singleton pricing engine instance.
  */
 export function getPricingEngine(): PricingEngine {
-  if (!engineInstance) {
-    engineInstance = createPricingEngine();
-  }
+  engineInstance ??= createPricingEngine();
   return engineInstance;
 }
 

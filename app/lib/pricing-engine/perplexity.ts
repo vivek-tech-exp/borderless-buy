@@ -6,7 +6,7 @@ import { BasePricingEngine } from "./base";
  * Ready for integration.
  */
 export class PerplexityPricingEngine extends BasePricingEngine {
-  private apiKey: string;
+  private readonly apiKey: string;
 
   constructor(apiKey: string) {
     super();
@@ -20,23 +20,10 @@ export class PerplexityPricingEngine extends BasePricingEngine {
     query: string
   ): Promise<{ product: Product; prompt: string } | { error: string; prompt: string } | null> {
     this.error("Perplexity engine not yet implemented. Please use Gemini or OpenAI.");
+    this.log("Perplexity engine stub invoked", {
+      query,
+      hasApiKey: this.apiKey.length > 0,
+    });
     return null;
-    
-    // TODO: Implement Perplexity integration
-    // const prompt = this.buildPrompt(query);
-    // const response = await fetch("https://api.perplexity.ai/chat/completions", {
-    //   method: "POST",
-    //   headers: {
-    //     "Authorization": `Bearer ${this.apiKey}`,
-    //     "Content-Type": "application/json",
-    //   },
-    //   body: JSON.stringify({
-    //     model: "sonar",
-    //     messages: [{ role: "user", content: prompt }],
-    //     return_citations: false,
-    //     return_images: false,
-    //   }),
-    // });
-    // // ... parse response
   }
 }

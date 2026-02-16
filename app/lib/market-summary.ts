@@ -54,19 +54,20 @@ function toCountryItems(
   convertToPreferred: (amount: number, sourceCurrency: string) => number
 ): CountryItems[] {
   return COUNTRY_CODES.map((code) => {
-    const items = itemsForTotals
-      .map((item) => {
-        const pricing = item.product.pricing[code];
-        if (!pricing || pricing.price === null) return null;
-        return {
-          id: item.id,
-          name: item.product.displayName,
-          converted: convertToPreferred(pricing.price, pricing.currency),
-          priceSource: pricing.priceSource,
-          buyingLink: pricing.buyingLink,
-        };
-      })
-      .filter((entry): entry is ConvertedItem => entry !== null);
+    const items = itemsForTotals.reduce<ConvertedItem[]>((accumulator, item) => {
+      const pricing = item.product.pricing[code];
+      if (!pricing || pricing.price === null) {
+        return accumulator;
+      }
+      accumulator.push({
+        id: item.id,
+        name: item.product.displayName,
+        converted: convertToPreferred(pricing.price, pricing.currency),
+        priceSource: pricing.priceSource,
+        buyingLink: pricing.buyingLink,
+      });
+      return accumulator;
+    }, []);
 
     return { code, label: COUNTRY_LABELS[code], items };
   }).filter((entry) => entry.items.length > 0);

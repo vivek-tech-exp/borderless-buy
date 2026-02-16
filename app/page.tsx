@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef, type Dispatch, type SetStateAction } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import { ChartPieIcon, CurrencyDollarIcon, LockClosedIcon } from "@heroicons/react/24/outline";
 import { AddItemForm } from "@/app/components/add-item-form";
 import { WishlistCard } from "@/app/components/wishlist-card";
@@ -24,9 +24,8 @@ import {
   updateWishlistTag,
 } from "@/app/lib/wishlist-client";
 import type { User } from "@supabase/supabase-js";
-import { COUNTRY_LABELS, type CountryCode } from "@/types";
+import { COUNTRY_LABELS, type CountryCode, type WishlistItem } from "@/types";
 import { formatCurrency } from "@/app/lib/utils";
-import type { WishlistItem } from "@/types";
 
 const LOCAL_WISHLIST_KEY = "borderless-buy-guest-wishlist";
 const LOCAL_INCOME_KEY = "borderless-buy-income";
@@ -36,8 +35,18 @@ const MAX_INCOME_VALUE = 99_999_999;
 const RETRY_DELAYS_MS = [100, 200] as const;
 
 function clearGuestStorage() {
-  localStorage.removeItem(LOCAL_WISHLIST_KEY);
-  localStorage.removeItem(LOCAL_INCOME_KEY);
+  globalThis.localStorage.removeItem(LOCAL_WISHLIST_KEY);
+  globalThis.localStorage.removeItem(LOCAL_INCOME_KEY);
+}
+
+function parseJsonArray<T>(value: string | null): T[] | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? (parsed as T[]) : null;
+  } catch {
+    return null;
+  }
 }
 
 function removeSelectionId(previous: Set<string>, id: string): Set<string> {
@@ -51,110 +60,110 @@ function hydrateGuestState(params: {
   setSelectedIds: Dispatch<SetStateAction<Set<string>>>;
   setIncomeInput: Dispatch<SetStateAction<string>>;
 }) {
-  try {
-    const stored = localStorage.getItem(LOCAL_WISHLIST_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored) as WishlistItem[];
-      params.setItems(parsed);
-    }
-  } catch {
+  const storedItems = parseJsonArray<WishlistItem>(globalThis.localStorage.getItem(LOCAL_WISHLIST_KEY));
+  if (storedItems) {
+    params.setItems(storedItems);
+  } else if (globalThis.localStorage.getItem(LOCAL_WISHLIST_KEY)) {
     console.warn("Failed to load wishlist from localStorage");
-    localStorage.removeItem(LOCAL_WISHLIST_KEY);
+    globalThis.localStorage.removeItem(LOCAL_WISHLIST_KEY);
   }
 
-  try {
-    const storedSelected = localStorage.getItem(LOCAL_SELECTED_KEY);
-    if (storedSelected) {
-      const parsed = JSON.parse(storedSelected) as string[];
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        params.setSelectedIds(new Set(parsed));
-      }
-    }
-  } catch {
+  const storedSelected = parseJsonArray<string>(globalThis.localStorage.getItem(LOCAL_SELECTED_KEY));
+  if (storedSelected && storedSelected.length > 0) {
+    params.setSelectedIds(new Set(storedSelected));
+  } else if (globalThis.localStorage.getItem(LOCAL_SELECTED_KEY)) {
     console.warn("Failed to load selected items from localStorage");
-    localStorage.removeItem(LOCAL_SELECTED_KEY);
+    globalThis.localStorage.removeItem(LOCAL_SELECTED_KEY);
   }
 
-  const savedIncome = localStorage.getItem(LOCAL_INCOME_KEY);
+  const savedIncome = globalThis.localStorage.getItem(LOCAL_INCOME_KEY);
   if (savedIncome) {
     params.setIncomeInput(savedIncome);
   }
 }
 
-export default function MainDashboard() {
-  // Initialize with empty arrays to match SSR (prevents hydration errors)
-  const [items, setItems] = useState<WishlistItem[]>([]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [lastPrompt, setLastPrompt] = useState<string | null>(null);
-  const [showPromptModal, setShowPromptModal] = useState(false);
-  const [showSignInModal, setShowSignInModal] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [totalsExpanded, setTotalsExpanded] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (typeof window === "undefined") return "global";
-    const stored = localStorage.getItem(VIEW_MODE_KEY);
-    return stored === "local" || stored === "global" ? stored : "global";
-  });
-  const [incomeInput, setIncomeInput] = useState<string>("");
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [expandCheapest, setExpandCheapest] = useState(true);
-  const [expandHome, setExpandHome] = useState(true);
-  const [selectedCompareCode, setSelectedCompareCode] = useState<CountryCode | null>(null);
-  const [totalsHighlight, setTotalsHighlight] = useState(false);
-  const hasLoadedFromStorage = useRef(false);
-  const totalsPanelRef = useRef<HTMLDivElement | null>(null);
+function createStorageChangeHandler(params: {
+  isSignedIn: boolean;
+  setIncomeInput: Dispatch<SetStateAction<string>>;
+  setItems: Dispatch<SetStateAction<WishlistItem[]>>;
+  setSelectedIds: Dispatch<SetStateAction<Set<string>>>;
+}) {
+  return (event: StorageEvent) => {
+    if (event.key === LOCAL_INCOME_KEY) {
+      params.setIncomeInput(event.newValue ?? "");
+      return;
+    }
 
-  const { convertToPreferred, preferredCurrency, preferredCountry } = useCurrency();
+    if (event.key === LOCAL_WISHLIST_KEY) {
+      if (params.isSignedIn) return;
+      const syncedItems = parseJsonArray<WishlistItem>(event.newValue);
+      if (syncedItems) {
+        params.setItems(syncedItems);
+      } else if (event.newValue === null) {
+        params.setItems([]);
+      } else {
+        console.warn("Failed to parse synced wishlist items");
+      }
+      return;
+    }
 
-  // Load guest data from localStorage after mount (client-only, avoids hydration errors)
-  useEffect(() => {
-    if (hasLoadedFromStorage.current) return;
+    if (event.key !== LOCAL_SELECTED_KEY) {
+      return;
+    }
 
-    hydrateGuestState({
-      setItems,
-      setSelectedIds,
-      setIncomeInput,
-    });
+    const syncedSelected = parseJsonArray<string>(event.newValue);
+    if (syncedSelected) {
+      params.setSelectedIds(new Set(syncedSelected));
+    } else if (event.newValue === null) {
+      params.setSelectedIds(new Set());
+    } else {
+      console.warn("Failed to parse synced selected items");
+    }
+  };
+}
 
-    hasLoadedFromStorage.current = true;
-  }, []);
+function useWishlistAuthSync(params: {
+  setItems: Dispatch<SetStateAction<WishlistItem[]>>;
+  setUser: Dispatch<SetStateAction<User | null>>;
+}) {
+  const { setItems, setUser } = params;
 
-  // Load persisted items for signed-in users; sync with auth state
   useEffect(() => {
     let mounted = true;
 
     async function migrateGuestDataToServer(token: string) {
-      const stored = localStorage.getItem(LOCAL_WISHLIST_KEY);
+      const stored = globalThis.localStorage.getItem(LOCAL_WISHLIST_KEY);
       if (!stored) return;
 
-      try {
-        const guestItems = JSON.parse(stored) as WishlistItem[];
-        if (guestItems.length === 0) {
-          clearGuestStorage();
-          return;
-        }
-
-        let successCount = 0;
-        let failureCount = 0;
-
-        for (const item of guestItems) {
-          const uploaded = await createWishlistItemWithRetry(token, item, [...RETRY_DELAYS_MS]);
-          if (uploaded) {
-            successCount += 1;
-          } else {
-            failureCount += 1;
-            console.warn(`Failed to migrate item "${item.product.displayName}" after retries`);
-          }
-        }
-
-        console.log(
-          `✓ Migration complete: ${successCount}/${guestItems.length} items uploaded` +
-          (failureCount > 0 ? `, ${failureCount} failed` : "")
-        );
+      const guestItems = parseJsonArray<WishlistItem>(stored);
+      if (!guestItems) {
         clearGuestStorage();
-      } catch (error) {
-        console.warn("Failed to migrate guest data:", error);
+        return;
       }
+
+      if (guestItems.length === 0) {
+        clearGuestStorage();
+        return;
+      }
+
+      let successCount = 0;
+      let failureCount = 0;
+
+      for (const item of guestItems) {
+        const uploaded = await createWishlistItemWithRetry(token, item, [...RETRY_DELAYS_MS]);
+        if (uploaded) {
+          successCount += 1;
+        } else {
+          failureCount += 1;
+          console.warn(`Failed to migrate item "${item.product.displayName}" after retries`);
+        }
+      }
+
+      console.log(
+        `✓ Migration complete: ${successCount}/${guestItems.length} items uploaded` +
+        (failureCount > 0 ? `, ${failureCount} failed` : "")
+      );
+      clearGuestStorage();
     }
 
     async function syncWishlistFromServer(token: string) {
@@ -200,11 +209,53 @@ export default function MainDashboard() {
       mounted = false;
       sub.subscription.unsubscribe();
     };
+  }, [setItems, setUser]);
+}
+
+export default function MainDashboard() {
+  // Initialize with empty arrays to match SSR (prevents hydration errors)
+  const [items, setItems] = useState<WishlistItem[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lastPrompt, setLastPrompt] = useState<string | null>(null);
+  const [showPromptModal, setShowPromptModal] = useState(false);
+  const [showSignInModal, setShowSignInModal] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [totalsExpanded, setTotalsExpanded] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (globalThis.localStorage === undefined) return "global";
+    const stored = globalThis.localStorage.getItem(VIEW_MODE_KEY);
+    return stored === "local" || stored === "global" ? stored : "global";
+  });
+  const [incomeInput, setIncomeInput] = useState<string>("");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [expandCheapest, setExpandCheapest] = useState(true);
+  const [expandHome, setExpandHome] = useState(true);
+  const [selectedCompareCode, setSelectedCompareCode] = useState<CountryCode | null>(null);
+  const [totalsHighlight, setTotalsHighlight] = useState(false);
+  const hasLoadedFromStorage = useRef(false);
+  const totalsPanelRef = useRef<HTMLDivElement | null>(null);
+
+  const { convertToPreferred, preferredCurrency, preferredCountry } = useCurrency();
+
+  // Load guest data from localStorage after mount (client-only, avoids hydration errors)
+  useEffect(() => {
+    if (hasLoadedFromStorage.current) return;
+
+    hydrateGuestState({
+      setItems,
+      setSelectedIds,
+      setIncomeInput,
+    });
+
+    hasLoadedFromStorage.current = true;
   }, []);
 
+  // Load persisted items for signed-in users; sync with auth state.
+  useWishlistAuthSync({ setItems, setUser });
+
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mediaQuery = window.matchMedia("(min-width: 640px)");
+    if (typeof globalThis.matchMedia !== "function") return;
+    const mediaQuery = globalThis.matchMedia("(min-width: 640px)");
     const setDefault = () => setTotalsExpanded(mediaQuery.matches);
     setDefault();
     mediaQuery.addEventListener("change", setDefault);
@@ -212,8 +263,8 @@ export default function MainDashboard() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mediaQuery = window.matchMedia("(min-width: 640px)");
+    if (typeof globalThis.matchMedia !== "function") return;
+    const mediaQuery = globalThis.matchMedia("(min-width: 640px)");
     const setDetailsDefault = () => {
       const isDesktop = mediaQuery.matches;
       setExpandCheapest(isDesktop);
@@ -226,7 +277,7 @@ export default function MainDashboard() {
 
   const handleViewModeChange = useCallback((mode: ViewMode) => {
     setViewMode(mode);
-    localStorage.setItem(VIEW_MODE_KEY, mode);
+    globalThis.localStorage.setItem(VIEW_MODE_KEY, mode);
   }, []);
 
   const rollbackAddedItem = useCallback((id: string) => {
@@ -312,7 +363,7 @@ export default function MainDashboard() {
     if (!hasLoadedFromStorage.current) return;
     if (user) return;
     try {
-      localStorage.setItem(LOCAL_WISHLIST_KEY, JSON.stringify(items));
+      globalThis.localStorage.setItem(LOCAL_WISHLIST_KEY, JSON.stringify(items));
     } catch (error) {
       // Check if it's a quota error
       if (error instanceof DOMException && error.name === "QuotaExceededError") {
@@ -326,9 +377,9 @@ export default function MainDashboard() {
     if (user) return;
     try {
       if (incomeInput) {
-        localStorage.setItem(LOCAL_INCOME_KEY, incomeInput);
+        globalThis.localStorage.setItem(LOCAL_INCOME_KEY, incomeInput);
       } else {
-        localStorage.removeItem(LOCAL_INCOME_KEY);
+        globalThis.localStorage.removeItem(LOCAL_INCOME_KEY);
       }
     } catch {
       // If storage fails, silently skip.
@@ -337,47 +388,15 @@ export default function MainDashboard() {
 
   // Sync income across tabs in real-time
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === LOCAL_INCOME_KEY) {
-        // Income changed in another tab
-        if (e.newValue) {
-          setIncomeInput(e.newValue);
-        } else {
-          setIncomeInput("");
-        }
-      }
-      
-      // Sync wishlist items across tabs for guest users
-      if (e.key === LOCAL_WISHLIST_KEY && !user) {
-        if (e.newValue) {
-          try {
-            const updatedItems = JSON.parse(e.newValue) as WishlistItem[];
-            setItems(updatedItems);
-          } catch {
-            console.warn("Failed to parse synced wishlist items");
-          }
-        } else {
-          setItems([]);
-        }
-      }
+    const handleStorageChange = createStorageChangeHandler({
+      isSignedIn: Boolean(user),
+      setIncomeInput,
+      setItems,
+      setSelectedIds,
+    });
 
-      if (e.key === LOCAL_SELECTED_KEY) {
-        if (e.newValue) {
-          try {
-            const updatedSelected = JSON.parse(e.newValue) as string[];
-            if (Array.isArray(updatedSelected)) {
-              setSelectedIds(new Set(updatedSelected));
-            }
-          } catch {
-            console.warn("Failed to parse synced selected items");
-          }
-        } else {
-          setSelectedIds(new Set());
-        }
-      }
-    };
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
+    globalThis.addEventListener("storage", handleStorageChange);
+    return () => globalThis.removeEventListener("storage", handleStorageChange);
   }, [user]);
 
   const effectiveSelectedIds = useMemo(() => {
@@ -390,9 +409,9 @@ export default function MainDashboard() {
     try {
       const selectedArray = Array.from(effectiveSelectedIds);
       if (selectedArray.length > 0) {
-        localStorage.setItem(LOCAL_SELECTED_KEY, JSON.stringify(selectedArray));
+        globalThis.localStorage.setItem(LOCAL_SELECTED_KEY, JSON.stringify(selectedArray));
       } else {
-        localStorage.removeItem(LOCAL_SELECTED_KEY);
+        globalThis.localStorage.removeItem(LOCAL_SELECTED_KEY);
       }
     } catch {
       // If storage fails, silently skip.
@@ -440,8 +459,6 @@ export default function MainDashboard() {
   const {
     totalItems,
     totalsByCountry,
-    bestMarket,
-    bestTotal,
     potentialSavings,
     marketList,
     effectiveBestCode,
@@ -453,6 +470,7 @@ export default function MainDashboard() {
     bestItems,
     compareItems,
   } = marketSummary;
+  const localTotal = totalsByCountry.find((entry) => entry.code === preferredCountry)?.total ?? 0;
 
   const showTotals = itemsForTotals.length > 0;
 
@@ -465,6 +483,73 @@ export default function MainDashboard() {
     }, 120);
     return () => clearTimeout(timer);
   }, [totalsExpanded]);
+
+  let wishlistContent: ReactNode;
+  if (items.length === 0) {
+    wishlistContent = (
+      <div className="relative rounded-[12px] border px-6 py-16 text-center" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+        <div className="mx-auto max-w-sm space-y-6">
+          <div className="flex justify-center">
+            <div className="h-12 w-12 rounded-full border-2 flex items-center justify-center" style={{borderColor: 'var(--accent-primary)', opacity: 0.3}}>
+              <div className="h-6 w-6 rounded-full" style={{backgroundColor: 'var(--accent-primary)', opacity: 0.2}} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-lg sm:text-xl font-semibold text-[var(--text-primary)]">
+              Your list is empty.
+            </h3>
+            <p className="text-sm sm:text-base text-[var(--text-secondary)] leading-relaxed">
+              Start adding the things that matter to you. Whether it&apos;s a piece of tech, a vehicle, or a tool for your craft—let&apos;s find out what it really costs.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              const input = document.querySelector('input[placeholder*="What"]') as HTMLInputElement;
+              input?.focus();
+            }}
+            className="text-sm font-medium transition-colors"
+            style={{color: 'var(--accent-primary)'}}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--accent-hover)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--accent-primary)';
+            }}
+          >
+            Start adding
+          </button>
+        </div>
+      </div>
+    );
+  } else if (displayItems.length === 0) {
+    wishlistContent = (
+      <div className="rounded-[12px] border px-6 py-10 text-center" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+        <p className="text-sm sm:text-base text-[var(--text-secondary)]">
+          No items match this tag yet.
+        </p>
+      </div>
+    );
+  } else {
+    wishlistContent = (
+      <ul className="grid w-full gap-4 lg:grid-cols-2">
+        {displayItems.map((item) => (
+          <li key={item.id} className="min-w-0">
+            <WishlistCard
+              item={item}
+              selected={effectiveSelectedIds.has(item.id)}
+              onToggleSelect={handleToggleSelect}
+              onRemove={handleRemove}
+              viewMode={viewMode}
+              incomeAmount={safeIncomeAmount}
+              onIncomeFocus={handleIncomeFocus}
+              onUpdateTag={handleUpdateTag}
+              availableTags={availableTags}
+            />
+          </li>
+        ))}
+      </ul>
+    );
+  }
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
@@ -682,65 +767,7 @@ export default function MainDashboard() {
             ))}
           </div>
         )}
-        {items.length === 0 ? (
-          <div className="relative rounded-[12px] border px-6 py-16 text-center" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
-            <div className="mx-auto max-w-sm space-y-6">
-              <div className="flex justify-center">
-                <div className="h-12 w-12 rounded-full border-2 flex items-center justify-center" style={{borderColor: 'var(--accent-primary)', opacity: 0.3}}>
-                  <div className="h-6 w-6 rounded-full" style={{backgroundColor: 'var(--accent-primary)', opacity: 0.2}} />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <h3 className="text-lg sm:text-xl font-semibold text-[var(--text-primary)]">
-                  Your list is empty.
-                </h3>
-                <p className="text-sm sm:text-base text-[var(--text-secondary)] leading-relaxed">
-                  Start adding the things that matter to you. Whether it&apos;s a piece of tech, a vehicle, or a tool for your craft—let&apos;s find out what it really costs.
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  const input = document.querySelector('input[placeholder*="What"]') as HTMLInputElement;
-                  input?.focus();
-                }}
-                className="text-sm font-medium transition-colors"
-                style={{color: 'var(--accent-primary)'}}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.color = 'var(--accent-hover)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.color = 'var(--accent-primary)';
-                }}
-              >
-                Start adding
-              </button>
-            </div>
-          </div>
-        ) : displayItems.length === 0 ? (
-          <div className="rounded-[12px] border px-6 py-10 text-center" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
-            <p className="text-sm sm:text-base text-[var(--text-secondary)]">
-              No items match this tag yet.
-            </p>
-          </div>
-        ) : (
-          <ul className="grid w-full gap-4 lg:grid-cols-2">
-            {displayItems.map((item) => (
-              <li key={item.id} className="min-w-0">
-                <WishlistCard
-                  item={item}
-                  selected={effectiveSelectedIds.has(item.id)}
-                  onToggleSelect={handleToggleSelect}
-                  onRemove={handleRemove}
-                  viewMode={viewMode}
-                  incomeAmount={safeIncomeAmount}
-                  onIncomeFocus={handleIncomeFocus}
-                  onUpdateTag={handleUpdateTag}
-                  availableTags={availableTags}
-                />
-              </li>
-            ))}
-          </ul>
-        )}
+        {wishlistContent}
       </section>
 
       <section className="mb-12">
@@ -804,131 +831,125 @@ export default function MainDashboard() {
           >
             {viewMode === "local" ? (
               /* Local Mode - Show only home country total */
-              <>
-                <div className="rounded-2xl border p-6 max-w-md" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
-                  <p className="text-xs uppercase tracking-wide font-medium mb-3" style={{color: 'var(--text-secondary)'}}>
-                    Total in {COUNTRY_LABELS[preferredCountry]}
-                  </p>
-                  <p className="text-4xl font-bold" style={{color: 'var(--accent-primary)'}}>
-                    {totalsByCountry.find(t => t.code === preferredCountry)?.total ?? 0 > 0
-                      ? formatCurrency(totalsByCountry.find(t => t.code === preferredCountry)!.total, preferredCurrency)
-                      : formatCurrency(0, preferredCurrency)}
-                  </p>
-                  <p className="text-xs mt-2" style={{color: 'var(--text-tertiary)'}}>
-                    Cost for {itemsForTotals.length} {itemsForTotals.length === 1 ? 'item' : 'items'}
-                  </p>
-                </div>
-              </>
+              <div className="rounded-2xl border p-6 max-w-md" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+                <p className="text-xs uppercase tracking-wide font-medium mb-3" style={{color: 'var(--text-secondary)'}}>
+                  Total in {COUNTRY_LABELS[preferredCountry]}
+                </p>
+                <p className="text-4xl font-bold" style={{color: 'var(--accent-primary)'}}>
+                  {localTotal > 0 ? formatCurrency(localTotal, preferredCurrency) : formatCurrency(0, preferredCurrency)}
+                </p>
+                <p className="text-xs mt-2" style={{color: 'var(--text-tertiary)'}}>
+                  Cost for {itemsForTotals.length} {itemsForTotals.length === 1 ? "item" : "items"}
+                </p>
+              </div>
             ) : (
               /* Global Mode - Show all countries */
-              <>
-                <div className="space-y-4">
-                  <div className="rounded-2xl border px-4 py-4 sm:px-5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                          Best market right now
+              <div className="space-y-4">
+                <div className="rounded-2xl border px-4 py-4 sm:px-5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                        Best market right now
+                      </p>
+                      <p className="mt-1 text-lg sm:text-xl font-semibold" style={{color: 'var(--text-primary)'}}>
+                        {effectiveBestMarket?.label ?? "Best market"}
+                      </p>
+                      {effectiveBestMarket && totalItems > 0 && (
+                        <p className="text-xs" style={{color: 'var(--text-tertiary)'}}>
+                          Coverage: {effectiveBestMarket.count}/{totalItems} items
                         </p>
-                        <p className="mt-1 text-lg sm:text-xl font-semibold" style={{color: 'var(--text-primary)'}}>
-                          {effectiveBestMarket?.label ?? "Best market"}
-                        </p>
-                        {effectiveBestMarket && totalItems > 0 && (
-                          <p className="text-xs" style={{color: 'var(--text-tertiary)'}}>
-                            Coverage: {effectiveBestMarket.count}/{totalItems} items
-                          </p>
-                        )}
-                        <div className="mt-2 flex items-baseline gap-2">
-                          <span className="text-2xl sm:text-3xl font-semibold" style={{color: 'var(--accent-primary)'}}>
-                            {effectiveBestMarket?.total ? formatCurrency(effectiveBestMarket.total, preferredCurrency) : "Not available"}
-                          </span>
-                          <span className="text-xs sm:text-sm" style={{color: 'var(--text-tertiary)'}}>
-                            total for {itemsForTotals.length} {itemsForTotals.length === 1 ? "item" : "items"}
-                          </span>
-                        </div>
+                      )}
+                      <div className="mt-2 flex items-baseline gap-2">
+                        <span className="text-2xl sm:text-3xl font-semibold" style={{color: 'var(--accent-primary)'}}>
+                          {effectiveBestMarket?.total ? formatCurrency(effectiveBestMarket.total, preferredCurrency) : "Not available"}
+                        </span>
+                        <span className="text-xs sm:text-sm" style={{color: 'var(--text-tertiary)'}}>
+                          total for {itemsForTotals.length} {itemsForTotals.length === 1 ? "item" : "items"}
+                        </span>
                       </div>
-                      {potentialSavings != null && potentialSavings > 0 && (
-                        <div className="inline-flex items-center rounded-full px-3 py-1 text-xs" style={{backgroundColor: 'var(--accent-light)', color: 'var(--accent-primary)'}}>
-                          Save {formatCurrency(potentialSavings, preferredCurrency)} vs home
-                        </div>
+                    </div>
+                    {potentialSavings != null && potentialSavings > 0 && (
+                      <div className="inline-flex items-center rounded-full px-3 py-1 text-xs" style={{backgroundColor: 'var(--accent-light)', color: 'var(--accent-primary)'}}>
+                        Save {formatCurrency(potentialSavings, preferredCurrency)} vs home
+                      </div>
+                    )}
+                  </div>
+                  <details
+                    className="mt-4 rounded-xl border px-4 py-3"
+                    style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}
+                    open={expandCheapest}
+                    onToggle={(e) => setExpandCheapest((e.target as HTMLDetailsElement).open)}
+                  >
+                    <summary className="cursor-pointer text-xs sm:text-sm font-medium" style={{color: 'var(--text-secondary)'}}>
+                      View items in {effectiveBestMarket?.label ?? "best market"}
+                    </summary>
+                    <div className="mt-3 space-y-3">
+                      <MarketItemsList
+                        marketCode={effectiveBestCode}
+                        items={bestItems}
+                        preferredCurrency={preferredCurrency}
+                      />
+                    </div>
+                  </details>
+                </div>
+
+                <div className="rounded-2xl border px-4 py-4 sm:px-5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+                        Compare another market
+                      </p>
+                      <p className="text-sm sm:text-base font-medium" style={{color: 'var(--text-secondary)'}}>
+                        See how close it gets to the best value
+                      </p>
+                      {effectiveCompareMarket && totalItems > 0 && (
+                        <p className="text-xs" style={{color: 'var(--text-tertiary)'}}>
+                          Coverage: {effectiveCompareMarket.count}/{totalItems} items
+                        </p>
                       )}
                     </div>
-                    <details
-                      className="mt-4 rounded-xl border px-4 py-3"
-                      style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}
-                      open={expandCheapest}
-                      onToggle={(e) => setExpandCheapest((e.target as HTMLDetailsElement).open)}
+                    <select
+                      value={effectiveCompareCode ?? ""}
+                      onChange={(e) => setSelectedCompareCode(e.target.value as CountryCode)}
+                      className="rounded-md border px-2 py-1 text-xs sm:text-sm"
+                      style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-secondary)'}}
                     >
-                      <summary className="cursor-pointer text-xs sm:text-sm font-medium" style={{color: 'var(--text-secondary)'}}>
-                        View items in {effectiveBestMarket?.label ?? "best market"}
-                      </summary>
-                      <div className="mt-3 space-y-3">
-                        <MarketItemsList
-                          marketCode={effectiveBestCode}
-                          items={bestItems}
-                          preferredCurrency={preferredCurrency}
-                        />
-                      </div>
-                    </details>
+                      {marketList.map((entry) => (
+                        <option key={entry.code} value={entry.code}>
+                          {entry.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-
-                  <div className="rounded-2xl border px-4 py-4 sm:px-5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                          Compare another market
-                        </p>
-                        <p className="text-sm sm:text-base font-medium" style={{color: 'var(--text-secondary)'}}>
-                          See how close it gets to the best value
-                        </p>
-                        {effectiveCompareMarket && totalItems > 0 && (
-                          <p className="text-xs" style={{color: 'var(--text-tertiary)'}}>
-                            Coverage: {effectiveCompareMarket.count}/{totalItems} items
-                          </p>
-                        )}
-                      </div>
-                      <select
-                        value={effectiveCompareCode ?? ""}
-                        onChange={(e) => setSelectedCompareCode(e.target.value as CountryCode)}
-                        className="rounded-md border px-2 py-1 text-xs sm:text-sm"
-                        style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-secondary)'}}
-                      >
-                        {marketList.map((entry) => (
-                          <option key={entry.code} value={entry.code}>
-                            {entry.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="mt-3 flex items-baseline gap-2">
-                      <span className="text-xl font-semibold" style={{color: 'var(--text-primary)'}}>
-                        {compareTotal > 0 ? formatCurrency(compareTotal, preferredCurrency) : "Not available"}
-                      </span>
-                      <span className="text-xs sm:text-sm" style={{color: 'var(--text-tertiary)'}}>
-                        {compareSavings != null && compareSavings > 0
-                          ? `About ${formatCurrency(compareSavings, preferredCurrency)} above best value`
-                          : "Aligned with the best value total"}
-                      </span>
-                    </div>
-                    <details
-                      className="mt-4 rounded-xl border px-4 py-3"
-                      style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}
-                      open={expandHome}
-                      onToggle={(e) => setExpandHome((e.target as HTMLDetailsElement).open)}
-                    >
-                      <summary className="cursor-pointer text-xs sm:text-sm font-medium" style={{color: 'var(--text-secondary)'}}>
-                        View items in {COUNTRY_LABELS[effectiveCompareCode]}
-                      </summary>
-                      <div className="mt-3 space-y-3">
-                        <MarketItemsList
-                          marketCode={effectiveCompareCode}
-                          items={compareItems}
-                          preferredCurrency={preferredCurrency}
-                        />
-                      </div>
-                    </details>
+                  <div className="mt-3 flex items-baseline gap-2">
+                    <span className="text-xl font-semibold" style={{color: 'var(--text-primary)'}}>
+                      {compareTotal > 0 ? formatCurrency(compareTotal, preferredCurrency) : "Not available"}
+                    </span>
+                    <span className="text-xs sm:text-sm" style={{color: 'var(--text-tertiary)'}}>
+                      {compareSavings != null && compareSavings > 0
+                        ? `About ${formatCurrency(compareSavings, preferredCurrency)} above best value`
+                        : "Aligned with the best value total"}
+                    </span>
                   </div>
+                  <details
+                    className="mt-4 rounded-xl border px-4 py-3"
+                    style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}
+                    open={expandHome}
+                    onToggle={(e) => setExpandHome((e.target as HTMLDetailsElement).open)}
+                  >
+                    <summary className="cursor-pointer text-xs sm:text-sm font-medium" style={{color: 'var(--text-secondary)'}}>
+                      View items in {COUNTRY_LABELS[effectiveCompareCode]}
+                    </summary>
+                    <div className="mt-3 space-y-3">
+                      <MarketItemsList
+                        marketCode={effectiveCompareCode}
+                        items={compareItems}
+                        preferredCurrency={preferredCurrency}
+                      />
+                    </div>
+                  </details>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </section>

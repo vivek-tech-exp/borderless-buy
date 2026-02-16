@@ -10,8 +10,9 @@ interface ViewModeToggleProps {
   countryLabel: string;
 }
 
-export function ViewModeToggle({ mode, onToggle, countryLabel }: ViewModeToggleProps) {
+export function ViewModeToggle({ mode, onToggle, countryLabel }: Readonly<ViewModeToggleProps>) {
   const isGlobal = mode === "global";
+  const isLocal = mode === "local";
 
   return (
     <div className="flex items-center justify-center sm:justify-start">
@@ -39,9 +40,9 @@ export function ViewModeToggle({ mode, onToggle, countryLabel }: ViewModeToggleP
           onClick={() => onToggle("local")}
           className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs sm:text-sm font-semibold transition-all"
           style={{
-            backgroundColor: !isGlobal ? 'var(--accent-primary)' : 'transparent',
-            color: !isGlobal ? 'white' : 'var(--text-secondary)',
-            boxShadow: !isGlobal ? '0 6px 16px rgba(0,0,0,0.15)' : 'none',
+            backgroundColor: isLocal ? 'var(--accent-primary)' : 'transparent',
+            color: isLocal ? 'white' : 'var(--text-secondary)',
+            boxShadow: isLocal ? '0 6px 16px rgba(0,0,0,0.15)' : 'none',
           }}
           title={`Show ${countryLabel} prices only`}
         >

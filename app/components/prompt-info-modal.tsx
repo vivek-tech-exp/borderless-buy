@@ -8,7 +8,7 @@ interface PromptInfoModalProps {
   onClose: () => void;
 }
 
-export function PromptInfoModal({ prompt, onClose }: PromptInfoModalProps) {
+export function PromptInfoModal({ prompt, onClose }: Readonly<PromptInfoModalProps>) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
