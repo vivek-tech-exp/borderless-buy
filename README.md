@@ -20,6 +20,38 @@ npm install
 npm run dev
 ```
 
+## Git hooks for security
+This repo uses Husky to block commits/pushes when security checks fail.
+
+- **Pre-commit:**
+  - `gitleaks` scan of staged changes
+  - `npm audit` (`high+`, production deps) only when `package.json` / lockfile changed
+- **Pre-push:**
+  - `gitleaks` scan of commits being pushed
+  - `npm audit` (`high+`, all deps)
+
+Install gitleaks CLI first (required):
+
+```bash
+brew install gitleaks
+```
+
+Run checks manually:
+
+```bash
+npm run security:check
+npm run security:gitleaks:repo   # optional full-history deep scan
+```
+
+`npm audit` needs access to `registry.npmjs.org`.
+
+Temporary bypass (not recommended):
+
+```bash
+SKIP_GITLEAKS=1 git commit -m "..."
+SKIP_SECURITY_AUDIT=1 git push
+```
+
 ## Docs
 - PRD and roadmap: docs/PRD.md
 - Tech setup: docs/TECH_SETUP.md

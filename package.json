@@ -9,7 +9,14 @@
     "test:verbose": "node tests/simple-test.js",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "prepare": "husky",
+    "security:gitleaks:staged": "sh scripts/security/check-gitleaks.sh staged",
+    "security:gitleaks:push": "sh scripts/security/check-gitleaks.sh push",
+    "security:gitleaks:repo": "sh scripts/security/check-gitleaks.sh repo",
+    "security:audit:commit": "sh scripts/security/check-vulnerabilities.sh commit",
+    "security:audit:push": "sh scripts/security/check-vulnerabilities.sh push",
+    "security:check": "npm run security:gitleaks:push && npm run security:audit:push"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
@@ -33,6 +40,7 @@
     "dotenv": "^16.3.1",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.15",
+    "husky": "^9.1.7",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
     "typescript": "^5.6.3"
