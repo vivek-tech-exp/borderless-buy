@@ -16,7 +16,9 @@
     "security:gitleaks:repo": "sh scripts/security/check-gitleaks.sh repo",
     "security:audit:commit": "sh scripts/security/check-vulnerabilities.sh commit",
     "security:audit:push": "sh scripts/security/check-vulnerabilities.sh push",
-    "security:check": "npm run security:gitleaks:push && npm run security:audit:push"
+    "security:check": "npm run security:gitleaks:push && npm run security:audit:push",
+    "security:update": "npm update && npm audit fix && npm audit --audit-level=high",
+    "security:update:force": "npm update && npm audit fix --force && npm audit --audit-level=high"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
