@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 /**
- * Optional: Supabase auth can be wired here later (e.g. refresh session, protect routes).
+ * Optional: Supabase auth can be wired here later (for example, refresh session or protect routes).
  * For now, all routes are public.
  */
-export function middleware(request: NextRequest) {
+export function proxy(_request: NextRequest) {
   return NextResponse.next();
 }
 

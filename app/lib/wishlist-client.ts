@@ -1,4 +1,4 @@
-import { supabase } from "@/app/lib/supabase";
+import { isSupabaseConfigured, supabase } from "@/app/lib/supabase";
 import type { WishlistItem } from "@/types";
 
 const JSON_HEADERS = { "Content-Type": "application/json" } as const;
@@ -25,6 +25,9 @@ function buildErrorMessage(response: Response, payload: WishlistApiPayload, fall
 }
 
 export async function getAccessToken(): Promise<string | null> {
+  if (!isSupabaseConfigured) {
+    return null;
+  }
   const {
     data: { session },
   } = await supabase.auth.getSession();

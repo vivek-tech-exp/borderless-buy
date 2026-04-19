@@ -12,7 +12,7 @@ import { ViewModeToggle, type ViewMode } from "@/app/components/view-mode-toggle
 import { MarketItemsList } from "@/app/components/market-items-list";
 import { Input } from "@/app/components/ui/input";
 import { useCurrency } from "@/app/lib/currency-context";
-import { supabase } from "@/app/lib/supabase";
+import { isSupabaseConfigured, supabase } from "@/app/lib/supabase";
 import { SignInModal } from "@/app/components/sign-in-modal";
 import { buildMarketSummary, type MarketSummary } from "@/app/lib/market-summary";
 import {
@@ -129,6 +129,11 @@ function useWishlistAuthSync(params: {
   const { setItems, setUser } = params;
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setUser(null);
+      return;
+    }
+
     let mounted = true;
 
     async function migrateGuestDataToServer(token: string) {

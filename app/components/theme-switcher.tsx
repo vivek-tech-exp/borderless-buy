@@ -2,15 +2,15 @@
 
 import { useTheme } from "@/app/lib/theme-context";
 import { SunIcon, MoonIcon } from "@heroicons/react/24/outline";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+function subscribe(): () => void {
+  return () => {};
+}
 
 export function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(subscribe, () => true, () => false);
 
   if (!mounted) {
     return <div className="h-10 w-10" />;

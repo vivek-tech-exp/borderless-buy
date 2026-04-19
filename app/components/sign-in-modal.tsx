@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/app/lib/supabase";
+import { getSupabaseConfigError, isSupabaseConfigured, supabase } from "@/app/lib/supabase";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
 interface SignInModalProps {
@@ -17,6 +17,11 @@ export function SignInModal({ isOpen, onClose, onUserChange }: Readonly<SignInMo
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setMessage(getSupabaseConfigError());
+      return;
+    }
+
     let mounted = true;
     async function init() {
       const { data } = await supabase.auth.getSession();
@@ -66,6 +71,10 @@ export function SignInModal({ isOpen, onClose, onUserChange }: Readonly<SignInMo
   }, [isOpen]);
 
   async function signIn() {
+    if (!isSupabaseConfigured) {
+      setMessage(getSupabaseConfigError());
+      return;
+    }
     if (!email) return setMessage("Oops! Please enter your email.");
     setMessage(null);
     setLoading(true);
@@ -91,6 +100,10 @@ export function SignInModal({ isOpen, onClose, onUserChange }: Readonly<SignInMo
   }
 
   async function signOut() {
+    if (!isSupabaseConfigured) {
+      setMessage(getSupabaseConfigError());
+      return;
+    }
     await supabase.auth.signOut();
     setUser(null);
     onClose();
@@ -126,8 +139,8 @@ export function SignInModal({ isOpen, onClose, onUserChange }: Readonly<SignInMo
           // Signed in state
           <div className="flex flex-col gap-6">
             <div>
-              <h2 className="text-xl font-semibold mb-2" style={{color: 'var(--text-primary)'}}>You&apos;re signed in!</h2>
-              <p className="text-sm" style={{color: 'var(--text-secondary)'}}>Your wishlist is now saved forever.</p>
+              <h2 className="text-xl font-semibold mb-2" style={{color: 'var(--text-primary)'}}>You&apos;re signed in</h2>
+              <p className="text-sm" style={{color: 'var(--text-secondary)'}}>Your wishlist can now sync with this account.</p>
             </div>
             <div className="flex items-center gap-3 p-4 rounded-[12px] border" style={{backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-primary)'}}>
               <div className="flex-1 min-w-0">
@@ -197,19 +210,19 @@ export function SignInModal({ isOpen, onClose, onUserChange }: Readonly<SignInMo
 
               <button
                 onClick={signIn}
-                disabled={loading}
+                disabled={loading || !isSupabaseConfigured}
                 className="h-12 w-full rounded-[12px] text-sm font-medium uppercase tracking-wide text-white transition-all duration-200"
                 style={{
                   backgroundColor: `var(--btn-primary-bg)`,
                   color: `var(--btn-primary-text)`,
-                  opacity: loading ? 0.5 : 1,
-                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading || !isSupabaseConfigured ? 0.5 : 1,
+                  cursor: loading || !isSupabaseConfigured ? 'not-allowed' : 'pointer',
                 }}
                 onMouseEnter={(e) => {
-                  if (!loading) e.currentTarget.style.backgroundColor = 'var(--btn-primary-hover)';
+                  if (!loading && isSupabaseConfigured) e.currentTarget.style.backgroundColor = 'var(--btn-primary-hover)';
                 }}
                 onMouseLeave={(e) => {
-                  if (!loading) e.currentTarget.style.backgroundColor = 'var(--btn-primary-bg)';
+                  if (!loading && isSupabaseConfigured) e.currentTarget.style.backgroundColor = 'var(--btn-primary-bg)';
                 }}
               >
                 {loading ? "Sending magic link…" : "Send magic link"}
@@ -223,7 +236,7 @@ export function SignInModal({ isOpen, onClose, onUserChange }: Readonly<SignInMo
             </div>
 
             <p className="text-xs text-center" style={{color: 'var(--text-tertiary)'}}>
-              By signing in, you agree to our imaginary terms of service.
+              Email sign-in is used only to access your saved wishlist.
             </p>
           </div>
         )}

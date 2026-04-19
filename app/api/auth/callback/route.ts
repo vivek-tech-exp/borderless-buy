@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/app/lib/supabase";
+import { isSupabaseConfigured, supabase } from "@/app/lib/supabase";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
+
+  if (!isSupabaseConfigured) {
+    return NextResponse.redirect(requestUrl.origin);
+  }
 
   if (code) {
     try {

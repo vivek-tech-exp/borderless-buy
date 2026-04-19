@@ -1,69 +1,58 @@
-# Product Requirements Document (PRD)
+# Product Requirements
 
-## Overview
-Borderless Buy helps people decide where to purchase wishlist items by comparing global prices, availability, and affordability. It presents best-market insights per item and for the full list, with simple guidance on what to buy abroad vs locally.
+## Product Summary
 
-## Problem Statement
-Shoppers with global options do not have a clear, trustworthy view of where an item is cheapest or which country yields the best combined total for a wishlist. Manual research is slow and error-prone.
+Borderless Buy helps shoppers compare wishlist prices across countries. It answers two practical questions:
+- Where is each item cheapest?
+- What is the best total market for the full list?
 
-## Goals
-- Provide a clear "best market" recommendation per item and for the full list.
-- Make affordability and savings obvious at a glance.
-- Keep the experience fast, mobile-friendly, and easy to understand.
+## User Problem
 
-## Primary Users
-- Price-sensitive travelers comparing local vs overseas purchase options.
-- Power shoppers building a wishlist of high-value items.
+People comparing local and overseas purchases often rely on scattered retailer pages, manual currency conversion, and rough memory. That process is slow, inconsistent, and hard to trust.
 
-## Current Features (Baseline)
-- Wishlist creation with AI-assisted product detection.
-- Global price comparison per item with home-market fallback.
-- Market comparison totals (best market and compare market).
-- Analytics pie chart for best country distribution.
-- Supabase persistence with email magic link sign-in.
+## Product Goals
+- Make country-by-country price comparison easy to understand.
+- Show savings at both the item level and the wishlist level.
+- Keep the experience simple enough for non-technical users on mobile and desktop.
+- Preserve trust through clear sourcing, coverage limits, and straightforward language.
 
-## Success Metrics
-- % of sessions with at least one item added.
-- % of sessions that expand market comparison details.
-- Reduction in time-to-decision (surveyed or via UX tests).
-- Retention: return visits within 7 and 30 days.
+## Primary Audiences
+- Travelers deciding whether to buy an item abroad or at home.
+- Shoppers planning large or multi-item purchases.
+- Product and growth teams evaluating whether the experience supports faster decisions.
 
-## Constraints and Assumptions
-- Price data quality varies by country and retailer.
-- Exchange rates are fetched and may be temporarily unavailable.
-- User trust depends on transparency of sources and coverage.
+## Current Scope
+- Wishlist creation from product search
+- Per-item price comparison across markets
+- Whole-list market totals and comparison views
+- Income-based affordability context stored locally on the device
+- Email sign-in and synced wishlists through Supabase
 
-## Feature Enhancements (Next Iterations)
-1) Pricing Confidence
-- Surface confidence/coverage indicators per market.
-- Show last update timestamps and rate freshness.
+## Success Measures
+- Share of sessions with at least one item added
+- Share of sessions that view market totals
+- Time from first item to first meaningful comparison
+- Return usage for shoppers tracking planned purchases
 
-2) Market Comparison UX
-- Inline savings breakdown and travel cost assumptions.
-- Quick filter for "Best value" and "Most coverage" markets.
+## Product Principles
+- Clear before clever
+- Trustworthy before promotional
+- Mobile-friendly by default
+- Useful even when pricing coverage is incomplete
 
-3) Item Insights
-- Warranty and compatibility notes per region.
-- Region-specific restrictions (customs, carry-on limits).
+## Near-Term Opportunities
+- Show pricing freshness and coverage indicators
+- Add clearer savings breakdowns
+- Add region-specific notes such as warranty or compatibility considerations
+- Add export and sharing options for wishlists
 
-4) Saved Goals and Alerts
-- Price drop alerts per item/market.
-- Goal tracking tied to income and target price.
-
-5) Sharing and Collaboration
-- Shareable wishlist links.
-- Export list and prices to CSV.
-
-## Future Updates (Longer-Term)
-- Localized language and currency preferences.
-- Retailer-specific tax/shipping estimations.
-- Multi-currency budgeting and travel itinerary planning.
+## Longer-Term Opportunities
+- Better travel-cost modeling
+- Alerts for price changes
+- Localized language and currency preferences
+- Deeper retailer-level comparisons
 
 ## Non-Goals
-- Real-time stock tracking across every retailer.
-- Full customs duty calculation for every country pair.
-
-## Risks and Mitigations
-- Incomplete pricing coverage: add coverage badges and fallback messaging.
-- API rate limits: cache results and throttle background refresh.
-- Mobile UX regressions: add device-level QA checks.
+- Exhaustive real-time stock tracking across all retailers
+- Full customs and import-duty modeling for every country pair
+- General shopping discovery unrelated to an explicit wishlist
