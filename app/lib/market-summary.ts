@@ -56,7 +56,7 @@ function toCountryItems(
   return COUNTRY_CODES.map((code) => {
     const items = itemsForTotals.reduce<ConvertedItem[]>((accumulator, item) => {
       const pricing = item.product.pricing[code];
-      if (!pricing || pricing.price === null) {
+      if (pricing?.price == null) {
         return accumulator;
       }
       accumulator.push({
@@ -81,7 +81,7 @@ function toCountryTotals(
     let count = 0;
     const total = itemsForTotals.reduce((sum, item) => {
       const pricing = item.product.pricing[code];
-      if (!pricing || pricing.price === null) return sum;
+      if (pricing?.price == null) return sum;
       count += 1;
       return sum + convertToPreferred(pricing.price, pricing.currency);
     }, 0);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef, type ChangeEvent, type Dispatch, type MutableRefObject, type ReactNode, type SetStateAction } from "react";
 import { ChartPieIcon, CurrencyDollarIcon, LockClosedIcon } from "@heroicons/react/24/outline";
 import { AddItemForm } from "@/app/components/add-item-form";
 import { WishlistCard } from "@/app/components/wishlist-card";
@@ -14,7 +14,7 @@ import { Input } from "@/app/components/ui/input";
 import { useCurrency } from "@/app/lib/currency-context";
 import { supabase } from "@/app/lib/supabase";
 import { SignInModal } from "@/app/components/sign-in-modal";
-import { buildMarketSummary } from "@/app/lib/market-summary";
+import { buildMarketSummary, type MarketSummary } from "@/app/lib/market-summary";
 import {
   createWishlistItem,
   createWishlistItemWithRetry,
@@ -212,167 +212,48 @@ function useWishlistAuthSync(params: {
   }, [setItems, setUser]);
 }
 
-export default function MainDashboard() {
-  // Initialize with empty arrays to match SSR (prevents hydration errors)
-  const [items, setItems] = useState<WishlistItem[]>([]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [lastPrompt, setLastPrompt] = useState<string | null>(null);
-  const [showPromptModal, setShowPromptModal] = useState(false);
-  const [showSignInModal, setShowSignInModal] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [totalsExpanded, setTotalsExpanded] = useState(true);
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
-    if (globalThis.localStorage === undefined) return "global";
-    const stored = globalThis.localStorage.getItem(VIEW_MODE_KEY);
-    return stored === "local" || stored === "global" ? stored : "global";
-  });
-  const [incomeInput, setIncomeInput] = useState<string>("");
-  const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [expandCheapest, setExpandCheapest] = useState(true);
-  const [expandHome, setExpandHome] = useState(true);
-  const [selectedCompareCode, setSelectedCompareCode] = useState<CountryCode | null>(null);
-  const [totalsHighlight, setTotalsHighlight] = useState(false);
-  const hasLoadedFromStorage = useRef(false);
-  const totalsPanelRef = useRef<HTMLDivElement | null>(null);
-
-  const { convertToPreferred, preferredCurrency, preferredCountry } = useCurrency();
-
-  // Load guest data from localStorage after mount (client-only, avoids hydration errors)
-  useEffect(() => {
-    if (hasLoadedFromStorage.current) return;
-
-    hydrateGuestState({
-      setItems,
-      setSelectedIds,
-      setIncomeInput,
-    });
-
-    hasLoadedFromStorage.current = true;
-  }, []);
-
-  // Load persisted items for signed-in users; sync with auth state.
-  useWishlistAuthSync({ setItems, setUser });
+function useResponsiveDashboardSections(params: {
+  setTotalsExpanded: Dispatch<SetStateAction<boolean>>;
+  setExpandCheapest: Dispatch<SetStateAction<boolean>>;
+  setExpandHome: Dispatch<SetStateAction<boolean>>;
+}) {
+  const { setTotalsExpanded, setExpandCheapest, setExpandHome } = params;
 
   useEffect(() => {
     if (typeof globalThis.matchMedia !== "function") return;
     const mediaQuery = globalThis.matchMedia("(min-width: 640px)");
-    const setDefault = () => setTotalsExpanded(mediaQuery.matches);
-    setDefault();
-    mediaQuery.addEventListener("change", setDefault);
-    return () => mediaQuery.removeEventListener("change", setDefault);
-  }, []);
-
-  useEffect(() => {
-    if (typeof globalThis.matchMedia !== "function") return;
-    const mediaQuery = globalThis.matchMedia("(min-width: 640px)");
-    const setDetailsDefault = () => {
+    const syncResponsiveState = () => {
       const isDesktop = mediaQuery.matches;
+      setTotalsExpanded(isDesktop);
       setExpandCheapest(isDesktop);
       setExpandHome(isDesktop);
     };
-    setDetailsDefault();
-    mediaQuery.addEventListener("change", setDetailsDefault);
-    return () => mediaQuery.removeEventListener("change", setDetailsDefault);
-  }, []);
+    syncResponsiveState();
+    mediaQuery.addEventListener("change", syncResponsiveState);
+    return () => mediaQuery.removeEventListener("change", syncResponsiveState);
+  }, [setExpandCheapest, setExpandHome, setTotalsExpanded]);
+}
 
-  const handleViewModeChange = useCallback((mode: ViewMode) => {
-    setViewMode(mode);
-    globalThis.localStorage.setItem(VIEW_MODE_KEY, mode);
-  }, []);
-
-  const rollbackAddedItem = useCallback((id: string) => {
-    setItems((previous) => previous.filter((entry) => entry.id !== id));
-    setSelectedIds((previous) => removeSelectionId(previous, id));
-  }, []);
-
-  const handleAdd = useCallback(async (item: WishlistItem, prompt?: string) => {
-    setItems((previous) => [item, ...previous]);
-    setSelectedIds((previous) => new Set(previous).add(item.id));
-    if (prompt) setLastPrompt(prompt);
-
-    try {
-      const token = await getAccessToken();
-      if (!token) return;
-      await createWishlistItem(token, item);
-    } catch (error) {
-      rollbackAddedItem(item.id);
-      console.warn("Failed to persist wishlist item:", error);
-    }
-  }, [rollbackAddedItem]);
-
-  const handleRemove = useCallback((id: string) => {
-    setItems((prev) => prev.filter((i) => i.id !== id));
-    setSelectedIds((prev) => removeSelectionId(prev, id));
-
-    if (user) {
-      (async () => {
-        try {
-          const token = await getAccessToken();
-          if (!token) return;
-          await deleteWishlistItem(token, id);
-        } catch (error) {
-          console.warn("Error deleting item from server:", error);
-        }
-      })();
-    }
-  }, [user]);
-
-  const handleToggleSelect = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const handleUpdateTag = useCallback(async (id: string, tag: string | null) => {
-    setItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, tag: tag ?? undefined } : item))
-    );
-
-    if (!user) return;
-    try {
-      const token = await getAccessToken();
-      if (!token) return;
-      await updateWishlistTag(token, id, tag);
-    } catch (error) {
-      console.warn("Error updating tag:", error);
-    }
-  }, [user]);
-
-  const incomeAmount = Number(incomeInput);
-  const safeIncomeAmount = Number.isFinite(incomeAmount) ? incomeAmount : 0;
-
-  const handleIncomeFocus = useCallback(() => {
-    const input = document.getElementById("income-input") as HTMLInputElement | null;
-    input?.focus();
-  }, []);
-
-  // Validate and sanitize income input
-  const handleIncomeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    // Allow empty or valid positive numbers up to the configured max.
-    if (val === "" || (/^\d+(\.\d{0,2})?$/.test(val) && Number(val) <= MAX_INCOME_VALUE)) {
-      setIncomeInput(val);
-    }
-  }, []);
+function useGuestWishlistPersistence(params: {
+  items: WishlistItem[];
+  user: User | null;
+  hasLoadedFromStorage: MutableRefObject<boolean>;
+}) {
+  const { items, user, hasLoadedFromStorage } = params;
 
   useEffect(() => {
-    // Don't save until we've loaded from storage (prevents overwriting with empty array)
-    if (!hasLoadedFromStorage.current) return;
-    if (user) return;
+    if (!hasLoadedFromStorage.current || user) return;
     try {
       globalThis.localStorage.setItem(LOCAL_WISHLIST_KEY, JSON.stringify(items));
     } catch (error) {
-      // Check if it's a quota error
       if (error instanceof DOMException && error.name === "QuotaExceededError") {
         console.error("localStorage quota exceeded");
       }
     }
-  }, [items, user]);
+  }, [items, user, hasLoadedFromStorage]);
+}
 
-  // Persist income preference for guests
+function useGuestIncomePersistence(incomeInput: string, user: User | null) {
   useEffect(() => {
     if (user) return;
     try {
@@ -385,8 +266,16 @@ export default function MainDashboard() {
       // If storage fails, silently skip.
     }
   }, [incomeInput, user]);
+}
 
-  // Sync income across tabs in real-time
+function useCrossTabStorageSync(params: {
+  user: User | null;
+  setIncomeInput: Dispatch<SetStateAction<string>>;
+  setItems: Dispatch<SetStateAction<WishlistItem[]>>;
+  setSelectedIds: Dispatch<SetStateAction<Set<string>>>;
+}) {
+  const { user, setIncomeInput, setItems, setSelectedIds } = params;
+
   useEffect(() => {
     const handleStorageChange = createStorageChangeHandler({
       isSignedIn: Boolean(user),
@@ -397,12 +286,14 @@ export default function MainDashboard() {
 
     globalThis.addEventListener("storage", handleStorageChange);
     return () => globalThis.removeEventListener("storage", handleStorageChange);
-  }, [user]);
+  }, [user, setIncomeInput, setItems, setSelectedIds]);
+}
 
-  const effectiveSelectedIds = useMemo(() => {
-    const currentItemIds = new Set(items.map((item) => item.id));
-    return new Set(Array.from(selectedIds).filter((id) => currentItemIds.has(id)));
-  }, [items, selectedIds]);
+function useSelectedIdsPersistence(params: {
+  effectiveSelectedIds: Set<string>;
+  hasLoadedFromStorage: MutableRefObject<boolean>;
+}) {
+  const { effectiveSelectedIds, hasLoadedFromStorage } = params;
 
   useEffect(() => {
     if (!hasLoadedFromStorage.current) return;
@@ -416,77 +307,36 @@ export default function MainDashboard() {
     } catch {
       // If storage fails, silently skip.
     }
-  }, [effectiveSelectedIds]);
+  }, [effectiveSelectedIds, hasLoadedFromStorage]);
+}
 
-  const availableTags = useMemo(() => {
-    const tags = new Set<string>();
-    items.forEach((item) => {
-      const trimmed = item.tag?.trim();
-      if (trimmed) tags.add(trimmed);
-    });
-    return Array.from(tags).sort((a, b) => a.localeCompare(b));
-  }, [items]);
-
-  const effectiveSelectedTag = selectedTag && availableTags.includes(selectedTag) ? selectedTag : null;
-
-  const displayItems = effectiveSelectedTag
-    ? items.filter((item) => item.tag?.trim() === effectiveSelectedTag)
-    : items;
-
-  const selectAll = useCallback(() => {
-    setSelectedIds(new Set(displayItems.map((i) => i.id)));
-  }, [displayItems]);
-
-  const deselectAll = useCallback(() => {
-    setSelectedIds(new Set());
-  }, []);
-
-  const selectedItems = displayItems.filter((item) => effectiveSelectedIds.has(item.id));
-  const itemsForTotals = effectiveSelectedTag ? displayItems : selectedItems;
-  const chartItems = itemsForTotals;
-
-  const marketSummary = useMemo(
-    () =>
-      buildMarketSummary({
-        itemsForTotals,
-        preferredCountry,
-        selectedBestCode: null,
-        selectedCompareCode,
-        convertToPreferred,
-      }),
-    [itemsForTotals, preferredCountry, selectedCompareCode, convertToPreferred]
-  );
+function renderWishlistContent(params: {
+  items: WishlistItem[];
+  displayItems: WishlistItem[];
+  effectiveSelectedIds: Set<string>;
+  handleToggleSelect: (id: string) => void;
+  handleRemove: (id: string) => void;
+  viewMode: ViewMode;
+  safeIncomeAmount: number;
+  handleIncomeFocus: () => void;
+  handleUpdateTag: (id: string, tag: string | null) => Promise<void>;
+  availableTags: string[];
+}): ReactNode {
   const {
-    totalItems,
-    totalsByCountry,
-    potentialSavings,
-    marketList,
-    effectiveBestCode,
-    effectiveCompareCode,
-    effectiveBestMarket,
-    effectiveCompareMarket,
-    compareTotal,
-    compareSavings,
-    bestItems,
-    compareItems,
-  } = marketSummary;
-  const localTotal = totalsByCountry.find((entry) => entry.code === preferredCountry)?.total ?? 0;
+    items,
+    displayItems,
+    effectiveSelectedIds,
+    handleToggleSelect,
+    handleRemove,
+    viewMode,
+    safeIncomeAmount,
+    handleIncomeFocus,
+    handleUpdateTag,
+    availableTags,
+  } = params;
 
-  const showTotals = itemsForTotals.length > 0;
-
-  useEffect(() => {
-    if (!totalsExpanded) return;
-    const timer = setTimeout(() => {
-      totalsPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      setTotalsHighlight(true);
-      setTimeout(() => setTotalsHighlight(false), 900);
-    }, 120);
-    return () => clearTimeout(timer);
-  }, [totalsExpanded]);
-
-  let wishlistContent: ReactNode;
   if (items.length === 0) {
-    wishlistContent = (
+    return (
       <div className="relative rounded-[12px] border px-6 py-16 text-center" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
         <div className="mx-auto max-w-sm space-y-6">
           <div className="flex justify-center">
@@ -499,7 +349,7 @@ export default function MainDashboard() {
               Your list is empty.
             </h3>
             <p className="text-sm sm:text-base text-[var(--text-secondary)] leading-relaxed">
-              Start adding the things that matter to you. Whether it&apos;s a piece of tech, a vehicle, or a tool for your craft—let&apos;s find out what it really costs.
+              Start adding the things that matter to you. Whether it&apos;s a piece of tech, a vehicle, or a tool for your craft-let&apos;s find out what it really costs.
             </p>
           </div>
           <button
@@ -521,35 +371,462 @@ export default function MainDashboard() {
         </div>
       </div>
     );
-  } else if (displayItems.length === 0) {
-    wishlistContent = (
+  }
+
+  if (displayItems.length === 0) {
+    return (
       <div className="rounded-[12px] border px-6 py-10 text-center" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
         <p className="text-sm sm:text-base text-[var(--text-secondary)]">
           No items match this tag yet.
         </p>
       </div>
     );
-  } else {
-    wishlistContent = (
-      <ul className="grid w-full gap-4 lg:grid-cols-2">
-        {displayItems.map((item) => (
-          <li key={item.id} className="min-w-0">
-            <WishlistCard
-              item={item}
-              selected={effectiveSelectedIds.has(item.id)}
-              onToggleSelect={handleToggleSelect}
-              onRemove={handleRemove}
-              viewMode={viewMode}
-              incomeAmount={safeIncomeAmount}
-              onIncomeFocus={handleIncomeFocus}
-              onUpdateTag={handleUpdateTag}
-              availableTags={availableTags}
-            />
-          </li>
-        ))}
-      </ul>
-    );
   }
+
+  return (
+    <ul className="grid w-full gap-4 lg:grid-cols-2">
+      {displayItems.map((item) => (
+        <li key={item.id} className="min-w-0">
+          <WishlistCard
+            item={item}
+            selected={effectiveSelectedIds.has(item.id)}
+            onToggleSelect={handleToggleSelect}
+            onRemove={handleRemove}
+            viewMode={viewMode}
+            incomeAmount={safeIncomeAmount}
+            onIncomeFocus={handleIncomeFocus}
+            onUpdateTag={handleUpdateTag}
+            availableTags={availableTags}
+          />
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function DashboardTotalsHeader(props: Readonly<{
+  compareSavings: number | null;
+  preferredCurrency: string;
+  totalsExpanded: boolean;
+  setTotalsExpanded: Dispatch<SetStateAction<boolean>>;
+}>) {
+  const { compareSavings, preferredCurrency, totalsExpanded, setTotalsExpanded } = props;
+
+  return (
+    <div className="mb-6 rounded-2xl border px-4 py-4 sm:px-5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full" style={{backgroundColor: 'var(--accent-light)', color: 'var(--accent-primary)'}}>
+            <CurrencyDollarIcon className="h-4 w-4" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+              Market comparison
+            </p>
+            <h2 className="text-base sm:text-lg font-semibold" style={{color: 'var(--text-primary)'}}>
+              Best total for your list
+            </h2>
+            <div className="flex flex-wrap items-center gap-2 text-xs" style={{color: 'var(--text-tertiary)'}}>
+              <span>80%+ item coverage</span>
+              {compareSavings != null && compareSavings > 0 && (
+                <span className="inline-flex items-center gap-2 rounded-full px-3 py-1" style={{backgroundColor: 'var(--accent-light)', color: 'var(--accent-primary)'}}>
+                  Save {formatCurrency(compareSavings, preferredCurrency)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setTotalsExpanded((prev) => !prev)}
+          className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors sm:hidden"
+          style={{borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-primary)'}}
+          aria-expanded={totalsExpanded}
+          aria-controls="totals-panel"
+        >
+          {totalsExpanded ? "Hide details" : "Show details"}
+          <svg
+            className={`h-3.5 w-3.5 transition-transform ${totalsExpanded ? "rotate-180" : ""}`}
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            aria-hidden
+          >
+            <path d="M5.23 7.21a.75.75 0 011.06.02L10 11.2l3.71-3.97a.75.75 0 111.1 1.02l-4.25 4.55a.75.75 0 01-1.1 0L5.21 8.27a.75.75 0 01.02-1.06z" />
+          </svg>
+        </button>
+      </div>
+      <div className="mt-3" />
+    </div>
+  );
+}
+
+function DashboardLocalTotalsCard(props: Readonly<{
+  preferredCountry: CountryCode;
+  preferredCurrency: string;
+  localTotal: number;
+  itemsForTotals: WishlistItem[];
+}>) {
+  const { preferredCountry, preferredCurrency, localTotal, itemsForTotals } = props;
+
+  return (
+    <div className="rounded-2xl border p-6 max-w-md" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+      <p className="text-xs uppercase tracking-wide font-medium mb-3" style={{color: 'var(--text-secondary)'}}>
+        Total in {COUNTRY_LABELS[preferredCountry]}
+      </p>
+      <p className="text-4xl font-bold" style={{color: 'var(--accent-primary)'}}>
+        {localTotal > 0 ? formatCurrency(localTotal, preferredCurrency) : formatCurrency(0, preferredCurrency)}
+      </p>
+      <p className="text-xs mt-2" style={{color: 'var(--text-tertiary)'}}>
+        Cost for {itemsForTotals.length} {itemsForTotals.length === 1 ? "item" : "items"}
+      </p>
+    </div>
+  );
+}
+
+function DashboardBestMarketCard(props: Readonly<{
+  marketSummary: MarketSummary;
+  preferredCurrency: string;
+  itemsForTotals: WishlistItem[];
+  expandCheapest: boolean;
+  setExpandCheapest: Dispatch<SetStateAction<boolean>>;
+}>) {
+  const {
+    marketSummary,
+    preferredCurrency,
+    itemsForTotals,
+    expandCheapest,
+    setExpandCheapest,
+  } = props;
+  const {
+    totalItems,
+    potentialSavings,
+    effectiveBestCode,
+    effectiveBestMarket,
+    bestItems,
+  } = marketSummary;
+
+  return (
+    <div className="rounded-2xl border px-4 py-4 sm:px-5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+            Best market right now
+          </p>
+          <p className="mt-1 text-lg sm:text-xl font-semibold" style={{color: 'var(--text-primary)'}}>
+            {effectiveBestMarket?.label ?? "Best market"}
+          </p>
+          {effectiveBestMarket && totalItems > 0 && (
+            <p className="text-xs" style={{color: 'var(--text-tertiary)'}}>
+              Coverage: {effectiveBestMarket.count}/{totalItems} items
+            </p>
+          )}
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-semibold" style={{color: 'var(--accent-primary)'}}>
+              {effectiveBestMarket?.total ? formatCurrency(effectiveBestMarket.total, preferredCurrency) : "Not available"}
+            </span>
+            <span className="text-xs sm:text-sm" style={{color: 'var(--text-tertiary)'}}>
+              total for {itemsForTotals.length} {itemsForTotals.length === 1 ? "item" : "items"}
+            </span>
+          </div>
+        </div>
+        {potentialSavings != null && potentialSavings > 0 && (
+          <div className="inline-flex items-center rounded-full px-3 py-1 text-xs" style={{backgroundColor: 'var(--accent-light)', color: 'var(--accent-primary)'}}>
+            Save {formatCurrency(potentialSavings, preferredCurrency)} vs home
+          </div>
+        )}
+      </div>
+      <details
+        className="mt-4 rounded-xl border px-4 py-3"
+        style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}
+        open={expandCheapest}
+        onToggle={(e) => setExpandCheapest((e.target as HTMLDetailsElement).open)}
+      >
+        <summary className="cursor-pointer text-xs sm:text-sm font-medium" style={{color: 'var(--text-secondary)'}}>
+          View items in {effectiveBestMarket?.label ?? "best market"}
+        </summary>
+        <div className="mt-3 space-y-3">
+          <MarketItemsList
+            marketCode={effectiveBestCode}
+            items={bestItems}
+            preferredCurrency={preferredCurrency}
+          />
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function DashboardCompareMarketCard(props: Readonly<{
+  marketSummary: MarketSummary;
+  preferredCurrency: string;
+  expandHome: boolean;
+  setExpandHome: Dispatch<SetStateAction<boolean>>;
+  setSelectedCompareCode: Dispatch<SetStateAction<CountryCode | null>>;
+}>) {
+  const { marketSummary, preferredCurrency, expandHome, setExpandHome, setSelectedCompareCode } = props;
+  const {
+    totalItems,
+    marketList,
+    effectiveCompareCode,
+    effectiveCompareMarket,
+    compareTotal,
+    compareSavings,
+    compareItems,
+  } = marketSummary;
+
+  return (
+    <div className="rounded-2xl border px-4 py-4 sm:px-5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
+            Compare another market
+          </p>
+          <p className="text-sm sm:text-base font-medium" style={{color: 'var(--text-secondary)'}}>
+            See how close it gets to the best value
+          </p>
+          {effectiveCompareMarket && totalItems > 0 && (
+            <p className="text-xs" style={{color: 'var(--text-tertiary)'}}>
+              Coverage: {effectiveCompareMarket.count}/{totalItems} items
+            </p>
+          )}
+        </div>
+        <select
+          value={effectiveCompareCode ?? ""}
+          onChange={(e) => setSelectedCompareCode(e.target.value as CountryCode)}
+          className="rounded-md border px-2 py-1 text-xs sm:text-sm"
+          style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-secondary)'}}
+        >
+          {marketList.map((entry) => (
+            <option key={entry.code} value={entry.code}>
+              {entry.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="mt-3 flex items-baseline gap-2">
+        <span className="text-xl font-semibold" style={{color: 'var(--text-primary)'}}>
+          {compareTotal > 0 ? formatCurrency(compareTotal, preferredCurrency) : "Not available"}
+        </span>
+        <span className="text-xs sm:text-sm" style={{color: 'var(--text-tertiary)'}}>
+          {compareSavings != null && compareSavings > 0
+            ? `About ${formatCurrency(compareSavings, preferredCurrency)} above best value`
+            : "Aligned with the best value total"}
+        </span>
+      </div>
+      <details
+        className="mt-4 rounded-xl border px-4 py-3"
+        style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}
+        open={expandHome}
+        onToggle={(e) => setExpandHome((e.target as HTMLDetailsElement).open)}
+      >
+        <summary className="cursor-pointer text-xs sm:text-sm font-medium" style={{color: 'var(--text-secondary)'}}>
+          View items in {COUNTRY_LABELS[effectiveCompareCode]}
+        </summary>
+        <div className="mt-3 space-y-3">
+          <MarketItemsList
+            marketCode={effectiveCompareCode}
+            items={compareItems}
+            preferredCurrency={preferredCurrency}
+          />
+        </div>
+      </details>
+    </div>
+  );
+}
+
+function DashboardGlobalTotalsCards(props: Readonly<{
+  marketSummary: MarketSummary;
+  preferredCurrency: string;
+  itemsForTotals: WishlistItem[];
+  expandCheapest: boolean;
+  setExpandCheapest: Dispatch<SetStateAction<boolean>>;
+  expandHome: boolean;
+  setExpandHome: Dispatch<SetStateAction<boolean>>;
+  setSelectedCompareCode: Dispatch<SetStateAction<CountryCode | null>>;
+}>) {
+  const {
+    marketSummary,
+    preferredCurrency,
+    itemsForTotals,
+    expandCheapest,
+    setExpandCheapest,
+    expandHome,
+    setExpandHome,
+    setSelectedCompareCode,
+  } = props;
+
+  return (
+    <div className="space-y-4">
+      <DashboardBestMarketCard
+        marketSummary={marketSummary}
+        preferredCurrency={preferredCurrency}
+        itemsForTotals={itemsForTotals}
+        expandCheapest={expandCheapest}
+        setExpandCheapest={setExpandCheapest}
+      />
+      <DashboardCompareMarketCard
+        marketSummary={marketSummary}
+        preferredCurrency={preferredCurrency}
+        expandHome={expandHome}
+        setExpandHome={setExpandHome}
+        setSelectedCompareCode={setSelectedCompareCode}
+      />
+    </div>
+  );
+}
+
+function DashboardTotalsSection(props: Readonly<{
+  showTotals: boolean;
+  marketSummary: MarketSummary;
+  preferredCurrency: string;
+  preferredCountry: CountryCode;
+  totalsExpanded: boolean;
+  setTotalsExpanded: Dispatch<SetStateAction<boolean>>;
+  totalsPanelRef: MutableRefObject<HTMLDivElement | null>;
+  totalsHighlight: boolean;
+  viewMode: ViewMode;
+  localTotal: number;
+  itemsForTotals: WishlistItem[];
+  expandCheapest: boolean;
+  setExpandCheapest: Dispatch<SetStateAction<boolean>>;
+  expandHome: boolean;
+  setExpandHome: Dispatch<SetStateAction<boolean>>;
+  setSelectedCompareCode: Dispatch<SetStateAction<CountryCode | null>>;
+}>) {
+  const {
+    showTotals,
+    marketSummary,
+    preferredCurrency,
+    preferredCountry,
+    totalsExpanded,
+    setTotalsExpanded,
+    totalsPanelRef,
+    totalsHighlight,
+    viewMode,
+    localTotal,
+    itemsForTotals,
+    expandCheapest,
+    setExpandCheapest,
+    expandHome,
+    setExpandHome,
+    setSelectedCompareCode,
+  } = props;
+
+  if (!showTotals) {
+    return null;
+  }
+
+  return (
+    <section className="mb-12">
+      <DashboardTotalsHeader
+        compareSavings={marketSummary.compareSavings}
+        preferredCurrency={preferredCurrency}
+        totalsExpanded={totalsExpanded}
+        setTotalsExpanded={setTotalsExpanded}
+      />
+      <div
+        id="totals-panel"
+        ref={totalsPanelRef}
+        className={`${totalsExpanded ? "block" : "hidden"} sm:block transition-all duration-200 ${totalsHighlight ? "ring-2 ring-emerald-200/60" : ""}`}
+      >
+        {viewMode === "local" ? (
+          <DashboardLocalTotalsCard
+            preferredCountry={preferredCountry}
+            preferredCurrency={preferredCurrency}
+            localTotal={localTotal}
+            itemsForTotals={itemsForTotals}
+          />
+        ) : (
+          <DashboardGlobalTotalsCards
+            marketSummary={marketSummary}
+            preferredCurrency={preferredCurrency}
+            itemsForTotals={itemsForTotals}
+            expandCheapest={expandCheapest}
+            setExpandCheapest={setExpandCheapest}
+            expandHome={expandHome}
+            setExpandHome={setExpandHome}
+            setSelectedCompareCode={setSelectedCompareCode}
+          />
+        )}
+      </div>
+    </section>
+  );
+}
+
+function DashboardPageView(props: Readonly<{
+  user: User | null;
+  items: WishlistItem[];
+  viewMode: ViewMode;
+  handleViewModeChange: (mode: ViewMode) => void;
+  preferredCountry: CountryCode;
+  preferredCurrency: string;
+  incomeInput: string;
+  handleIncomeChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  selectAll: () => void;
+  deselectAll: () => void;
+  availableTags: string[];
+  setSelectedTag: Dispatch<SetStateAction<string | null>>;
+  effectiveSelectedTag: string | null;
+  wishlistContent: ReactNode;
+  chartItems: WishlistItem[];
+  showTotals: boolean;
+  totalsExpanded: boolean;
+  setTotalsExpanded: Dispatch<SetStateAction<boolean>>;
+  totalsPanelRef: MutableRefObject<HTMLDivElement | null>;
+  totalsHighlight: boolean;
+  marketSummary: MarketSummary;
+  localTotal: number;
+  itemsForTotals: WishlistItem[];
+  expandCheapest: boolean;
+  setExpandCheapest: Dispatch<SetStateAction<boolean>>;
+  expandHome: boolean;
+  setExpandHome: Dispatch<SetStateAction<boolean>>;
+  setSelectedCompareCode: Dispatch<SetStateAction<CountryCode | null>>;
+  lastPrompt: string | null;
+  showPromptModal: boolean;
+  setShowPromptModal: Dispatch<SetStateAction<boolean>>;
+  showSignInModal: boolean;
+  setShowSignInModal: Dispatch<SetStateAction<boolean>>;
+  setUser: Dispatch<SetStateAction<User | null>>;
+  handleAdd: (item: WishlistItem, prompt?: string) => Promise<void>;
+}>) {
+  const {
+    user,
+    items,
+    viewMode,
+    handleViewModeChange,
+    preferredCountry,
+    preferredCurrency,
+    incomeInput,
+    handleIncomeChange,
+    selectAll,
+    deselectAll,
+    availableTags,
+    setSelectedTag,
+    effectiveSelectedTag,
+    wishlistContent,
+    chartItems,
+    showTotals,
+    totalsExpanded,
+    setTotalsExpanded,
+    totalsPanelRef,
+    totalsHighlight,
+    marketSummary,
+    localTotal,
+    itemsForTotals,
+    expandCheapest,
+    setExpandCheapest,
+    expandHome,
+    setExpandHome,
+    setSelectedCompareCode,
+    lastPrompt,
+    showPromptModal,
+    setShowPromptModal,
+    showSignInModal,
+    setShowSignInModal,
+    setUser,
+    handleAdd,
+  } = props;
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6 sm:py-16">
@@ -619,7 +896,7 @@ export default function MainDashboard() {
                     Keep your goals forever.
                   </span>
                   <span className="text-xs sm:text-sm text-[var(--text-tertiary)]">
-                    Sign in to secure them—always free.
+                    Sign in to secure them, always free.
                   </span>
                   <span className="text-xs sm:text-sm text-[var(--text-tertiary)]">
                     Stored safely on this device until you do.
@@ -778,182 +1055,24 @@ export default function MainDashboard() {
         <AnalyticsPie items={chartItems} />
       </section>
 
-      {showTotals && (
-        <section className="mb-12">
-          <div className="mb-6 rounded-2xl border px-4 py-4 sm:px-5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-full" style={{backgroundColor: 'var(--accent-light)', color: 'var(--accent-primary)'}}>
-                  <CurrencyDollarIcon className="h-4 w-4" />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                    Market comparison
-                  </p>
-                  <h2 className="text-base sm:text-lg font-semibold" style={{color: 'var(--text-primary)'}}>
-                    Best total for your list
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-2 text-xs" style={{color: 'var(--text-tertiary)'}}>
-                    <span>80%+ item coverage</span>
-                    {compareSavings != null && compareSavings > 0 && (
-                      <span className="inline-flex items-center gap-2 rounded-full px-3 py-1" style={{backgroundColor: 'var(--accent-light)', color: 'var(--accent-primary)'}}>
-                        Save {formatCurrency(compareSavings, preferredCurrency)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTotalsExpanded((prev) => !prev)}
-                className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors sm:hidden"
-                style={{borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', backgroundColor: 'var(--bg-primary)'}}
-                aria-expanded={totalsExpanded}
-                aria-controls="totals-panel"
-              >
-                {totalsExpanded ? "Hide details" : "Show details"}
-                <svg
-                  className={`h-3.5 w-3.5 transition-transform ${totalsExpanded ? "rotate-180" : ""}`}
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden
-                >
-                  <path d="M5.23 7.21a.75.75 0 011.06.02L10 11.2l3.71-3.97a.75.75 0 111.1 1.02l-4.25 4.55a.75.75 0 01-1.1 0L5.21 8.27a.75.75 0 01.02-1.06z" />
-                </svg>
-              </button>
-            </div>
-            <div className="mt-3" />
-          </div>
-          <div
-            id="totals-panel"
-            ref={totalsPanelRef}
-            className={`${totalsExpanded ? "block" : "hidden"} sm:block transition-all duration-200 ${totalsHighlight ? "ring-2 ring-emerald-200/60" : ""}`}
-          >
-            {viewMode === "local" ? (
-              /* Local Mode - Show only home country total */
-              <div className="rounded-2xl border p-6 max-w-md" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
-                <p className="text-xs uppercase tracking-wide font-medium mb-3" style={{color: 'var(--text-secondary)'}}>
-                  Total in {COUNTRY_LABELS[preferredCountry]}
-                </p>
-                <p className="text-4xl font-bold" style={{color: 'var(--accent-primary)'}}>
-                  {localTotal > 0 ? formatCurrency(localTotal, preferredCurrency) : formatCurrency(0, preferredCurrency)}
-                </p>
-                <p className="text-xs mt-2" style={{color: 'var(--text-tertiary)'}}>
-                  Cost for {itemsForTotals.length} {itemsForTotals.length === 1 ? "item" : "items"}
-                </p>
-              </div>
-            ) : (
-              /* Global Mode - Show all countries */
-              <div className="space-y-4">
-                <div className="rounded-2xl border px-4 py-4 sm:px-5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                        Best market right now
-                      </p>
-                      <p className="mt-1 text-lg sm:text-xl font-semibold" style={{color: 'var(--text-primary)'}}>
-                        {effectiveBestMarket?.label ?? "Best market"}
-                      </p>
-                      {effectiveBestMarket && totalItems > 0 && (
-                        <p className="text-xs" style={{color: 'var(--text-tertiary)'}}>
-                          Coverage: {effectiveBestMarket.count}/{totalItems} items
-                        </p>
-                      )}
-                      <div className="mt-2 flex items-baseline gap-2">
-                        <span className="text-2xl sm:text-3xl font-semibold" style={{color: 'var(--accent-primary)'}}>
-                          {effectiveBestMarket?.total ? formatCurrency(effectiveBestMarket.total, preferredCurrency) : "Not available"}
-                        </span>
-                        <span className="text-xs sm:text-sm" style={{color: 'var(--text-tertiary)'}}>
-                          total for {itemsForTotals.length} {itemsForTotals.length === 1 ? "item" : "items"}
-                        </span>
-                      </div>
-                    </div>
-                    {potentialSavings != null && potentialSavings > 0 && (
-                      <div className="inline-flex items-center rounded-full px-3 py-1 text-xs" style={{backgroundColor: 'var(--accent-light)', color: 'var(--accent-primary)'}}>
-                        Save {formatCurrency(potentialSavings, preferredCurrency)} vs home
-                      </div>
-                    )}
-                  </div>
-                  <details
-                    className="mt-4 rounded-xl border px-4 py-3"
-                    style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}
-                    open={expandCheapest}
-                    onToggle={(e) => setExpandCheapest((e.target as HTMLDetailsElement).open)}
-                  >
-                    <summary className="cursor-pointer text-xs sm:text-sm font-medium" style={{color: 'var(--text-secondary)'}}>
-                      View items in {effectiveBestMarket?.label ?? "best market"}
-                    </summary>
-                    <div className="mt-3 space-y-3">
-                      <MarketItemsList
-                        marketCode={effectiveBestCode}
-                        items={bestItems}
-                        preferredCurrency={preferredCurrency}
-                      />
-                    </div>
-                  </details>
-                </div>
-
-                <div className="rounded-2xl border px-4 py-4 sm:px-5" style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-secondary)'}}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-wider" style={{color: 'var(--text-tertiary)'}}>
-                        Compare another market
-                      </p>
-                      <p className="text-sm sm:text-base font-medium" style={{color: 'var(--text-secondary)'}}>
-                        See how close it gets to the best value
-                      </p>
-                      {effectiveCompareMarket && totalItems > 0 && (
-                        <p className="text-xs" style={{color: 'var(--text-tertiary)'}}>
-                          Coverage: {effectiveCompareMarket.count}/{totalItems} items
-                        </p>
-                      )}
-                    </div>
-                    <select
-                      value={effectiveCompareCode ?? ""}
-                      onChange={(e) => setSelectedCompareCode(e.target.value as CountryCode)}
-                      className="rounded-md border px-2 py-1 text-xs sm:text-sm"
-                      style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-secondary)'}}
-                    >
-                      {marketList.map((entry) => (
-                        <option key={entry.code} value={entry.code}>
-                          {entry.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="mt-3 flex items-baseline gap-2">
-                    <span className="text-xl font-semibold" style={{color: 'var(--text-primary)'}}>
-                      {compareTotal > 0 ? formatCurrency(compareTotal, preferredCurrency) : "Not available"}
-                    </span>
-                    <span className="text-xs sm:text-sm" style={{color: 'var(--text-tertiary)'}}>
-                      {compareSavings != null && compareSavings > 0
-                        ? `About ${formatCurrency(compareSavings, preferredCurrency)} above best value`
-                        : "Aligned with the best value total"}
-                    </span>
-                  </div>
-                  <details
-                    className="mt-4 rounded-xl border px-4 py-3"
-                    style={{borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)'}}
-                    open={expandHome}
-                    onToggle={(e) => setExpandHome((e.target as HTMLDetailsElement).open)}
-                  >
-                    <summary className="cursor-pointer text-xs sm:text-sm font-medium" style={{color: 'var(--text-secondary)'}}>
-                      View items in {COUNTRY_LABELS[effectiveCompareCode]}
-                    </summary>
-                    <div className="mt-3 space-y-3">
-                      <MarketItemsList
-                        marketCode={effectiveCompareCode}
-                        items={compareItems}
-                        preferredCurrency={preferredCurrency}
-                      />
-                    </div>
-                  </details>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+      <DashboardTotalsSection
+        showTotals={showTotals}
+        marketSummary={marketSummary}
+        preferredCurrency={preferredCurrency}
+        preferredCountry={preferredCountry}
+        totalsExpanded={totalsExpanded}
+        setTotalsExpanded={setTotalsExpanded}
+        totalsPanelRef={totalsPanelRef}
+        totalsHighlight={totalsHighlight}
+        viewMode={viewMode}
+        localTotal={localTotal}
+        itemsForTotals={itemsForTotals}
+        expandCheapest={expandCheapest}
+        setExpandCheapest={setExpandCheapest}
+        expandHome={expandHome}
+        setExpandHome={setExpandHome}
+        setSelectedCompareCode={setSelectedCompareCode}
+      />
 
       {showPromptModal && (
         <PromptInfoModal
@@ -968,5 +1087,284 @@ export default function MainDashboard() {
         onUserChange={setUser}
       />
     </main>
+  );
+}
+
+export default function MainDashboard() {
+  // Initialize with empty arrays to match SSR (prevents hydration errors)
+  const [items, setItems] = useState<WishlistItem[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [lastPrompt, setLastPrompt] = useState<string | null>(null);
+  const [showPromptModal, setShowPromptModal] = useState(false);
+  const [showSignInModal, setShowSignInModal] = useState(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [totalsExpanded, setTotalsExpanded] = useState(true);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (globalThis.localStorage === undefined) return "global";
+    const stored = globalThis.localStorage.getItem(VIEW_MODE_KEY);
+    return stored === "local" || stored === "global" ? stored : "global";
+  });
+  const [incomeInput, setIncomeInput] = useState<string>("");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [expandCheapest, setExpandCheapest] = useState(true);
+  const [expandHome, setExpandHome] = useState(true);
+  const [selectedCompareCode, setSelectedCompareCode] = useState<CountryCode | null>(null);
+  const [totalsHighlight, setTotalsHighlight] = useState(false);
+  const hasLoadedFromStorage = useRef(false);
+  const totalsPanelRef = useRef<HTMLDivElement | null>(null);
+
+  const { convertToPreferred, preferredCurrency, preferredCountry } = useCurrency();
+
+  // Load guest data from localStorage after mount (client-only, avoids hydration errors)
+  useEffect(() => {
+    if (hasLoadedFromStorage.current) return;
+
+    hydrateGuestState({
+      setItems,
+      setSelectedIds,
+      setIncomeInput,
+    });
+
+    hasLoadedFromStorage.current = true;
+  }, []);
+
+  // Load persisted items for signed-in users; sync with auth state.
+  useWishlistAuthSync({ setItems, setUser });
+  useResponsiveDashboardSections({
+    setTotalsExpanded,
+    setExpandCheapest,
+    setExpandHome,
+  });
+
+  const handleViewModeChange = useCallback((mode: ViewMode) => {
+    setViewMode(mode);
+    globalThis.localStorage.setItem(VIEW_MODE_KEY, mode);
+  }, []);
+
+  const rollbackAddedItem = useCallback((id: string) => {
+    setItems((previous) => previous.filter((entry) => entry.id !== id));
+    setSelectedIds((previous) => removeSelectionId(previous, id));
+  }, []);
+
+  const handleAdd = useCallback(async (item: WishlistItem, prompt?: string) => {
+    setItems((previous) => [item, ...previous]);
+    setSelectedIds((previous) => new Set(previous).add(item.id));
+    if (prompt) setLastPrompt(prompt);
+
+    try {
+      const token = await getAccessToken();
+      if (!token) return;
+      await createWishlistItem(token, item);
+    } catch (error) {
+      rollbackAddedItem(item.id);
+      console.warn("Failed to persist wishlist item:", error);
+    }
+  }, [rollbackAddedItem]);
+
+  const handleRemove = useCallback((id: string) => {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+    setSelectedIds((prev) => removeSelectionId(prev, id));
+
+    if (user) {
+      (async () => {
+        try {
+          const token = await getAccessToken();
+          if (!token) return;
+          await deleteWishlistItem(token, id);
+        } catch (error) {
+          console.warn("Error deleting item from server:", error);
+        }
+      })();
+    }
+  }, [user]);
+
+  const handleToggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const handleUpdateTag = useCallback(async (id: string, tag: string | null) => {
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, tag: tag ?? undefined } : item))
+    );
+
+    if (!user) return;
+    try {
+      const token = await getAccessToken();
+      if (!token) return;
+      await updateWishlistTag(token, id, tag);
+    } catch (error) {
+      console.warn("Error updating tag:", error);
+    }
+  }, [user]);
+
+  const incomeAmount = Number(incomeInput);
+  const safeIncomeAmount = Number.isFinite(incomeAmount) ? incomeAmount : 0;
+
+  const handleIncomeFocus = useCallback(() => {
+    const input = document.getElementById("income-input") as HTMLInputElement | null;
+    input?.focus();
+  }, []);
+
+  // Validate and sanitize income input
+  const handleIncomeChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    // Allow empty or valid positive numbers up to the configured max.
+    if (val === "" || (/^\d+(\.\d{0,2})?$/.test(val) && Number(val) <= MAX_INCOME_VALUE)) {
+      setIncomeInput(val);
+    }
+  }, []);
+
+  const effectiveSelectedIds = useMemo(() => {
+    const currentItemIds = new Set(items.map((item) => item.id));
+    return new Set(Array.from(selectedIds).filter((id) => currentItemIds.has(id)));
+  }, [items, selectedIds]);
+
+  useGuestWishlistPersistence({ items, user, hasLoadedFromStorage });
+  useGuestIncomePersistence(incomeInput, user);
+  useCrossTabStorageSync({
+    user,
+    setIncomeInput,
+    setItems,
+    setSelectedIds,
+  });
+  useSelectedIdsPersistence({ effectiveSelectedIds, hasLoadedFromStorage });
+
+  const availableTags = useMemo(() => {
+    const tags = new Set<string>();
+    items.forEach((item) => {
+      const trimmed = item.tag?.trim();
+      if (trimmed) tags.add(trimmed);
+    });
+    return Array.from(tags).sort((a, b) => a.localeCompare(b));
+  }, [items]);
+
+  const effectiveSelectedTag = selectedTag && availableTags.includes(selectedTag) ? selectedTag : null;
+
+  const displayItems = effectiveSelectedTag
+    ? items.filter((item) => item.tag?.trim() === effectiveSelectedTag)
+    : items;
+
+  const selectAll = useCallback(() => {
+    setSelectedIds(new Set(displayItems.map((i) => i.id)));
+  }, [displayItems]);
+
+  const deselectAll = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const selectedItems = displayItems.filter((item) => effectiveSelectedIds.has(item.id));
+  const itemsForTotals = effectiveSelectedTag ? displayItems : selectedItems;
+  const chartItems = itemsForTotals;
+
+  const marketSummary = useMemo(
+    () =>
+      buildMarketSummary({
+        itemsForTotals,
+        preferredCountry,
+        selectedBestCode: null,
+        selectedCompareCode,
+        convertToPreferred,
+      }),
+    [itemsForTotals, preferredCountry, selectedCompareCode, convertToPreferred]
+  );
+  const {
+    totalItems,
+    totalsByCountry,
+    potentialSavings,
+    marketList,
+    effectiveBestCode,
+    effectiveCompareCode,
+    effectiveBestMarket,
+    effectiveCompareMarket,
+    compareTotal,
+    compareSavings,
+    bestItems,
+    compareItems,
+  } = marketSummary;
+  const localTotal = totalsByCountry.find((entry) => entry.code === preferredCountry)?.total ?? 0;
+
+  const showTotals = itemsForTotals.length > 0;
+
+  useEffect(() => {
+    if (!totalsExpanded) return;
+    const timer = setTimeout(() => {
+      totalsPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setTotalsHighlight(true);
+      setTimeout(() => setTotalsHighlight(false), 900);
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [totalsExpanded]);
+
+  const wishlistContent = useMemo(
+    () =>
+      renderWishlistContent({
+        items,
+        displayItems,
+        effectiveSelectedIds,
+        handleToggleSelect,
+        handleRemove,
+        viewMode,
+        safeIncomeAmount,
+        handleIncomeFocus,
+        handleUpdateTag,
+        availableTags,
+      }),
+    [
+      items,
+      displayItems,
+      effectiveSelectedIds,
+      handleToggleSelect,
+      handleRemove,
+      viewMode,
+      safeIncomeAmount,
+      handleIncomeFocus,
+      handleUpdateTag,
+      availableTags,
+    ]
+  );
+
+  return (
+    <DashboardPageView
+      user={user}
+      items={items}
+      viewMode={viewMode}
+      handleViewModeChange={handleViewModeChange}
+      preferredCountry={preferredCountry}
+      preferredCurrency={preferredCurrency}
+      incomeInput={incomeInput}
+      handleIncomeChange={handleIncomeChange}
+      selectAll={selectAll}
+      deselectAll={deselectAll}
+      availableTags={availableTags}
+      setSelectedTag={setSelectedTag}
+      effectiveSelectedTag={effectiveSelectedTag}
+      wishlistContent={wishlistContent}
+      chartItems={chartItems}
+      showTotals={showTotals}
+      totalsExpanded={totalsExpanded}
+      setTotalsExpanded={setTotalsExpanded}
+      totalsPanelRef={totalsPanelRef}
+      totalsHighlight={totalsHighlight}
+      marketSummary={marketSummary}
+      localTotal={localTotal}
+      itemsForTotals={itemsForTotals}
+      expandCheapest={expandCheapest}
+      setExpandCheapest={setExpandCheapest}
+      expandHome={expandHome}
+      setExpandHome={setExpandHome}
+      setSelectedCompareCode={setSelectedCompareCode}
+      lastPrompt={lastPrompt}
+      showPromptModal={showPromptModal}
+      setShowPromptModal={setShowPromptModal}
+      showSignInModal={showSignInModal}
+      setShowSignInModal={setShowSignInModal}
+      setUser={setUser}
+      handleAdd={handleAdd}
+    />
   );
 }
