@@ -40,7 +40,22 @@ run_push_scan() {
     fi
   fi
 
-  echo "[security] No upstream detected. Running full-history gitleaks scan..."
+  if DEFAULT_REMOTE_REF="$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null)"; then
+    BASE_COMMIT="$(git merge-base HEAD "$DEFAULT_REMOTE_REF" 2>/dev/null || true)"
+    if [ -n "$BASE_COMMIT" ]; then
+      RANGE="$BASE_COMMIT..HEAD"
+      if [ -z "$(git rev-list -n 1 "$RANGE" 2>/dev/null)" ]; then
+        echo "[security] No outgoing commits to scan with gitleaks."
+        return 0
+      fi
+
+      echo "[security] No upstream detected. Running gitleaks on commits ahead of $DEFAULT_REMOTE_REF ($RANGE)..."
+      gitleaks git --log-opts "$RANGE" --no-banner --redact --exit-code 1
+      return 0
+    fi
+  fi
+
+  echo "[security] No upstream or default remote branch detected. Running full-history gitleaks scan..."
   run_full_history_scan
 }
 
