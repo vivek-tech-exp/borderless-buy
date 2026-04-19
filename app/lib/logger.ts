@@ -19,7 +19,7 @@ interface LogEntry {
  * Logger instance that provides structured logging across the app.
  */
 export class Logger {
-  private component: string;
+  private readonly component: string;
   private requestId?: string;
 
   constructor(component: string, requestId?: string) {
@@ -101,5 +101,5 @@ export function createLogger(component: string, requestId?: string): Logger {
  * Generate a unique request ID for correlation
  */
 export function generateRequestId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 }

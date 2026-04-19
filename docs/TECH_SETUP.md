@@ -1,51 +1,76 @@
-# Tech Setup
+# Technical Setup
+
+This guide is for developers running Borderless Buy locally.
 
 ## Prerequisites
-- Node.js 18+ (LTS recommended)
-- npm 9+ (or pnpm/yarn if you prefer)
-- A Supabase project (free tier works)
+- Node.js 18 or newer
+- npm 9 or newer
+- A Supabase project for sign-in and synced wishlists
+- A pricing provider key for full item resolution
 
-## Install
+## Installation
 ```bash
 npm install
 ```
 
 ## Environment Variables
-Create a `.env.local` in the project root:
+
+Create `.env.local` in the project root.
+
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=eyJ... (publishable key)
-SUPABASE_SECRET_KEY=... (server-only)
-GEMINI_API_KEY=... (server-only)
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+SUPABASE_SECRET_KEY=your-secret-key
+GEMINI_API_KEY=your-gemini-api-key
 ```
 
-## Supabase Setup
-1) Open the Supabase SQL editor.
-2) Run the migrations in order:
-- `supabase/migrations/001_create_wishlist.sql`
-- `supabase/migrations/002_add_tag_to_wishlist.sql`
+Optional provider configuration:
 
-## Development
+```bash
+PRICING_ENGINE=gemini
+OPENAI_API_KEY=
+PERPLEXITY_API_KEY=
+```
+
+Notes:
+- `NEXT_PUBLIC_*` values are safe for browser use.
+- `SUPABASE_SECRET_KEY` and provider API keys must stay server-side.
+- The app can build without Supabase variables, but sign-in and synced wishlists will be unavailable in that environment.
+
+## Supabase Setup
+1. Open the Supabase SQL editor.
+2. Run the migrations in order:
+   `supabase/migrations/001_create_wishlist.sql`
+   `supabase/migrations/002_add_tag_to_wishlist.sql`
+3. In Supabase Auth settings, allow your local callback URL:
+   `http://localhost:3000/api/auth/callback`
+
+## Local Development
 ```bash
 npm run dev
 ```
 
-## Build
+## Validation
 ```bash
+npm test
+npm run lint
 npm run build
 ```
 
-## Tests
+## Integration Test
+
+The integration script requires:
+- Supabase environment variables
+- A running local app on `http://localhost:3000`
+
+Run it with:
+
 ```bash
-node tests/run-tests.js
+npm run integration:test
 ```
 
 ## Common Issues
-- If prices do not convert, verify `/api/rates` is reachable and rates are not blocked by ad blockers.
-- If auth fails, confirm Supabase URL and publishable key are correct and the redirect URL is allowed in Supabase auth settings.
-
-## Useful Docs
-- Product requirements: docs/PRD.md
-- Design system: docs/DESIGN_SYSTEM.md
-- Pricing engine: docs/PRICING_ENGINE_ARCHITECTURE.md
-- Security audit: docs/SECURITY_AUDIT.md
+- If sign-in is unavailable, verify the Supabase URL, publishable key, and allowed redirect URL.
+- If wishlist API calls fail, verify `SUPABASE_SECRET_KEY` and the database migrations.
+- If product lookup fails, verify the pricing provider key for the selected provider.
+- If currency conversion looks wrong, verify `/api/rates` is reachable in the browser.

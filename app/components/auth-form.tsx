@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/app/lib/supabase";
+import { getSupabaseConfigError, isSupabaseConfigured, supabase } from "@/app/lib/supabase";
 
 export function AuthForm({ onUserChange }: { onUserChange?: (user: any) => void } = {}) {
   const [email, setEmail] = useState("");
@@ -10,6 +10,11 @@ export function AuthForm({ onUserChange }: { onUserChange?: (user: any) => void 
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setMessage(getSupabaseConfigError());
+      return;
+    }
+
     let mounted = true;
     async function init() {
       const { data } = await supabase.auth.getSession();
@@ -33,6 +38,10 @@ export function AuthForm({ onUserChange }: { onUserChange?: (user: any) => void 
   }, [onUserChange]);
 
   async function signIn() {
+    if (!isSupabaseConfigured) {
+      setMessage(getSupabaseConfigError());
+      return;
+    }
     if (!email) return setMessage("Oops! Please enter your email.");
     setMessage(null);
     setLoading(true);
@@ -58,6 +67,10 @@ export function AuthForm({ onUserChange }: { onUserChange?: (user: any) => void 
   }
 
   async function signOut() {
+    if (!isSupabaseConfigured) {
+      setMessage(getSupabaseConfigError());
+      return;
+    }
     await supabase.auth.signOut();
     setUser(null);
   }

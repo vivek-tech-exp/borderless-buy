@@ -1,32 +1,43 @@
 # Project Tour
 
-## High-Level Flow
-1) User adds items via the wishlist form.
-2) Each item is normalized and priced across markets.
-3) UI shows per-item best market and list-level totals.
-4) Optional sign-in persists data to Supabase.
+This guide is for developers who need a quick orientation to the codebase.
 
-## Key Folders
-- app/ - Next.js App Router pages, components, and styles.
-- app/components/ - UI components and feature modules.
-- app/lib/ - Context providers, utilities, and pricing engine logic.
-- app/api/ - Server routes for pricing, auth callbacks, and wishlist CRUD.
-- supabase/ - Database migrations.
-- tests/ - Smoke tests and integrity checks.
-- docs/ - Product, design, security, and architecture docs.
+## High-Level Product Flow
+1. A user adds an item from the main dashboard.
+2. The pricing layer resolves the product and gathers market pricing.
+3. The UI renders item cards, market totals, and comparison views.
+4. If the user is signed in, wishlist data is synced to Supabase.
+5. If the user is not signed in, wishlist state is stored locally in the browser.
 
-## Data Flow (Wishlist)
-- UI: AddItemForm -> MainDashboard state.
-- Persistence: /api/wishlist -> Supabase (when signed in).
-- Guest mode: localStorage keys in app/page.tsx.
+## Main Directories
+- `app/`: Next.js App Router entry points, layouts, routes, and page-level components
+- `app/components/`: reusable UI and feature components
+- `app/lib/`: shared state, client utilities, theme logic, and pricing integrations
+- `app/api/`: route handlers for wishlist, auth callback, product resolution, and rates
+- `supabase/`: SQL migrations
+- `tests/`: offline and integration-oriented test helpers
+- `docs/`: product, design, privacy, and engineering documentation
 
-## Data Flow (Pricing)
-- Pricing engine lives in app/lib/pricing-engine/.
-- Each item has per-country pricing + source metadata.
-- Currency conversion via /api/rates and app/lib/utils.
+## Request And State Flow
 
-## Where to Start
-- Main UI: app/page.tsx
-- Wishlist cards: app/components/wishlist-card.tsx
-- Pricing engine: app/lib/pricing-engine/
-- Supabase integration: app/lib/supabase.ts
+### Wishlist
+- The main dashboard in `app/page.tsx` owns list state and selection state.
+- Signed-in persistence goes through `/api/wishlist`.
+- Guest persistence uses browser `localStorage`.
+
+### Pricing
+- Product resolution lives in `app/lib/pricing-engine/`.
+- API entry for adding items is `app/api/add-item/route.ts`.
+- Currency conversion is handled through `/api/rates` and shared formatting utilities.
+
+### Auth
+- Supabase client configuration lives in `app/lib/supabase.ts`.
+- The auth callback route is `app/api/auth/callback/route.ts`.
+- Sign-in UI lives in `app/components/sign-in-modal.tsx`.
+
+## Good Starting Points
+- `app/page.tsx`: main dashboard state and page composition
+- `app/components/wishlist-card.tsx`: item-level presentation
+- `app/lib/market-summary.ts`: market totals and comparison logic
+- `app/lib/pricing-engine/`: provider abstraction and resolution logic
+- `app/api/wishlist/route.ts`: server-side persistence
