@@ -35,6 +35,13 @@ export interface PricingEngine {
 /**
  * Abstract base class with common utilities for all pricing engines.
  */
+export abstract class BasePricingEngine implements PricingEngine {
+  protected logger: Logger;
+
+  constructor() {
+    this.logger = createLogger(this.constructor.name);
+  }
+
   private pendingRequests = new Map<string, Promise<PricingResult | null>>();
 
   /**
