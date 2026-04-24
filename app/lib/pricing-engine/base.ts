@@ -100,7 +100,7 @@ export abstract class BasePricingEngine implements PricingEngine {
     this.logger.warn(message, data);
   }
 
-  protected error(message: string, err?: Error | string) {
-    this.logger.error(message, err);
+  protected error(message: string, err?: Error | string, data?: Record<string, unknown>) {
+    this.logger.error(message, err, data);
   }
 }

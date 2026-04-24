@@ -21,12 +21,12 @@ const SYSTEM_INSTRUCTION = [
   "You normalize a shopping query into one product and compare new-item pricing across 10 markets.",
   "Use only current mainstream retail listings and return strict JSON.",
   "If the query is gibberish, non-commercial, or too vague to resolve to one real product, return status=error.",
-  "For vague but valid shopping intent, choose one mainstream current-generation product and explain briefly in selection_rationale.",
+  "For vague but valid shopping intent, choose one mainstream current-generation product and explain VERY BRIEFLY (max 1 sentence) in selection_rationale.",
   "Match a single baseline configuration consistently across all markets.",
-  "If an exact match is unavailable in a market, choose the nearest superior variant, never an inferior one, and note the difference in notes.",
+  "If an exact match is unavailable in a market, choose the nearest superior variant and note briefly.",
   "Return raw local prices only. Do not convert currency.",
   "Prefer direct retailer links. If none exists, use a strong retailer search results URL for that market.",
-  "Keep notes empty unless a variant mismatch, stock caveat, or link limitation matters.",
+  "IMPORTANT: Keep 'notes' and 'selection_rationale' EXTREMELY concise. Avoid conversational filler.",
 ].join(" ");
 
 const COUNTRY_PRICING_SCHEMA: ResponseSchema = {
@@ -167,7 +167,7 @@ export class GeminiPricingEngine extends BasePricingEngine {
           responseSchema: GEMINI_RESPONSE_SCHEMA,
           temperature: 0,
           candidateCount: 1,
-          maxOutputTokens: 2200,
+          maxOutputTokens: 8192,
         },
       });
 
@@ -188,7 +188,25 @@ export class GeminiPricingEngine extends BasePricingEngine {
         });
       }
 
-      const parsed = JSON.parse(text) as Record<string, unknown>;
+      // Sanitize response: strip markdown code blocks if present
+      const cleanText = text.trim().replace(/^```json\n?/, "").replace(/\n?```$/, "").trim();
+
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(cleanText) as Record<string, unknown>;
+      } catch (parseError) {
+        this.error("Failed to parse Gemini response as JSON", parseError instanceof Error ? parseError : String(parseError), {
+          textLength: cleanText.length,
+          textStart: cleanText.substring(0, 200),
+          textEnd: cleanText.substring(cleanText.length - 200),
+        });
+        return this.useStaleCacheOrNull({
+          cached,
+          normalizedQuery,
+          prompt,
+        });
+      }
+
       const parsedResult = this.parseProductResponse(parsed, normalizedQuery);
 
       if (!parsedResult) {
