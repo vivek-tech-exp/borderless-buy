@@ -4,6 +4,8 @@ import { createLogger } from "@/app/lib/logger";
 import type { WishlistItem } from "@/types";
 
 const logger = createLogger("AddItemRoute");
+const GEMINI_PROMPT_DEBUG_ENABLED =
+  process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_DEBUG_GEMINI_PROMPT === "1";
 
 /**
  * POST /api/add-item
@@ -56,8 +58,10 @@ export async function POST(request: NextRequest) {
     if ("error" in result) {
       logger.warn("Pricing engine returned invalid query", {
         query,
+        normalizedQuery: result.normalizedQuery,
         requestId,
         message: result.error,
+        model: result.model,
       });
       return NextResponse.json(
         { error: result.error || "Product not found. Try a more specific name." },
@@ -75,10 +79,17 @@ export async function POST(request: NextRequest) {
 
     logger.info("Successfully added item", {
       productName: product.displayName,
+      normalizedQuery: result.normalizedQuery,
+      source: result.source,
+      model: result.model,
+      cacheAgeSeconds: result.cacheAgeSeconds,
       requestId,
     });
 
-    return NextResponse.json({ item, prompt });
+    return NextResponse.json({
+      item,
+      ...(GEMINI_PROMPT_DEBUG_ENABLED && prompt ? { prompt } : {}),
+    });
   } catch (err) {
     logger.error(
       "add-item API error",
@@ -91,4 +102,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-
