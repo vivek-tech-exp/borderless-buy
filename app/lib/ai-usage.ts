@@ -1,4 +1,4 @@
-import { createHash } from "crypto";
+import { createHmac } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { createLogger } from "@/app/lib/logger";
 
@@ -15,6 +15,21 @@ export const isAiUsageConfigured = Boolean(supabaseUrl && supabaseServiceRoleKey
 type AiUsageRow = {
   anonymous_id: string | null;
   free_credits_used: number;
+};
+
+type ConsumeFreeCreditRow = {
+  allowed: boolean;
+  free_credits_used: number;
+  free_credits_remaining: number;
+};
+
+export type AiUsageSnapshot = {
+  freeCreditsUsed: number;
+  freeCreditsRemaining: number;
+};
+
+export type ConsumeFreeCreditResult = AiUsageSnapshot & {
+  allowed: boolean;
 };
 
 export type AiProviderName = "gemini" | "mock";
@@ -59,21 +74,21 @@ export function sanitizeAnonymousId(value: unknown): string | null {
 }
 
 export function hashIpAddress(ipAddress: string | null): string | null {
-  if (!ipAddress) {
+  const secret = process.env.IP_HASH_SECRET;
+  if (!ipAddress || !secret) {
     return null;
   }
 
-  return createHash("sha256").update(ipAddress).digest("hex");
+  return createHmac("sha256", secret).update(ipAddress).digest("hex");
 }
 
 export function getFreeCreditsRemaining(freeCreditsUsed: number): number {
   return Math.max(FREE_AI_CREDITS - freeCreditsUsed, 0);
 }
 
-export async function getOrCreateAiUsage(params: {
+export async function getAiUsageSnapshot(params: {
   anonymousId: string | null;
-  ipHash: string | null;
-}): Promise<{ freeCreditsUsed: number; freeCreditsRemaining: number }> {
+}): Promise<AiUsageSnapshot> {
   const client = getAiUsageClient();
   if (!client || !params.anonymousId) {
     return {
@@ -108,65 +123,58 @@ export async function getOrCreateAiUsage(params: {
     };
   }
 
-  const nowIso = new Date().toISOString();
-  const { error: insertError } = await client.from("ai_usage").insert({
-    anonymous_id: params.anonymousId,
-    ip_hash: params.ipHash,
-    free_credits_used: 0,
-    updated_at: nowIso,
-  });
-
-  if (insertError) {
-    logger.warn("AI usage insert failed", {
-      anonymousId: params.anonymousId,
-      message: insertError.message,
-    });
-  }
-
   return {
     freeCreditsUsed: 0,
     freeCreditsRemaining: FREE_AI_CREDITS,
   };
 }
 
-export async function incrementFreeAiUsage(params: {
+export async function consumeFreeAiCredit(params: {
   anonymousId: string | null;
   ipHash: string | null;
-}): Promise<{ freeCreditsUsed: number; freeCreditsRemaining: number }> {
-  const current = await getOrCreateAiUsage(params);
+}): Promise<ConsumeFreeCreditResult> {
   const client = getAiUsageClient();
 
   if (!client || !params.anonymousId) {
+    logger.warn("AI usage quota cannot be consumed without Supabase and anonymousId", {
+      hasClient: Boolean(client),
+      hasAnonymousId: Boolean(params.anonymousId),
+    });
     return {
-      freeCreditsUsed: current.freeCreditsUsed + 1,
-      freeCreditsRemaining: getFreeCreditsRemaining(current.freeCreditsUsed + 1),
+      allowed: false,
+      freeCreditsUsed: FREE_AI_CREDITS,
+      freeCreditsRemaining: 0,
     };
   }
 
-  const nextUsed = current.freeCreditsUsed + 1;
-  const { error } = await client
-    .from("ai_usage")
-    .update({
-      free_credits_used: nextUsed,
-      ip_hash: params.ipHash,
-      updated_at: new Date().toISOString(),
+  const { data, error } = await client
+    .rpc("consume_ai_free_credit", {
+      p_anonymous_id: params.anonymousId,
+      p_ip_hash: params.ipHash,
+      p_max_credits: FREE_AI_CREDITS,
     })
-    .eq("anonymous_id", params.anonymousId);
+    .single();
 
   if (error) {
-    logger.warn("AI usage increment failed", {
+    logger.warn("AI usage credit consumption failed", {
       anonymousId: params.anonymousId,
       message: error.message,
     });
     return {
-      freeCreditsUsed: nextUsed,
-      freeCreditsRemaining: getFreeCreditsRemaining(nextUsed),
+      allowed: false,
+      freeCreditsUsed: FREE_AI_CREDITS,
+      freeCreditsRemaining: 0,
     };
   }
 
+  const row = data as ConsumeFreeCreditRow;
+  const used = Math.max(Number(row.free_credits_used) || 0, 0);
+  const remaining = Math.max(Number(row.free_credits_remaining) || 0, 0);
+
   return {
-    freeCreditsUsed: nextUsed,
-    freeCreditsRemaining: getFreeCreditsRemaining(nextUsed),
+    allowed: Boolean(row.allowed),
+    freeCreditsUsed: used,
+    freeCreditsRemaining: remaining,
   };
 }
 

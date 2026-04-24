@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   FREE_AI_CREDITS,
-  getOrCreateAiUsage,
+  consumeFreeAiCredit,
+  getAiUsageSnapshot,
   hashIpAddress,
-  incrementFreeAiUsage,
   logAiRequest,
   sanitizeAnonymousId,
 } from "@/app/lib/ai-usage";
@@ -156,10 +156,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const usage = await getOrCreateAiUsage({ anonymousId, ipHash });
     const cached = await getPricingCacheEntry(normalizedQuery);
 
     if (cached.fresh) {
+      const usage = await getAiUsageSnapshot({ anonymousId });
       const item = createWishlistItem(cached.fresh.product);
       const meta = buildMeta({
         cacheHit: true,
@@ -186,13 +186,13 @@ export async function POST(request: NextRequest) {
     }
 
     const userGeminiApiKey = parseUserGeminiApiKey(body);
+    const usage = await getAiUsageSnapshot({ anonymousId });
     const freeQuotaRemaining = usage.freeCreditsRemaining;
     const shouldUseMock = provider === "mock";
     const shouldUseUserKey = provider === "gemini" && Boolean(userGeminiApiKey);
-    const shouldUsePlatformKey =
-      provider === "gemini" && !shouldUseUserKey && freeQuotaRemaining > 0;
+    const shouldUsePlatformKey = provider === "gemini" && !shouldUseUserKey;
 
-    if (provider === "gemini" && !shouldUseUserKey && freeQuotaRemaining <= 0) {
+    if (shouldUsePlatformKey && !anonymousId) {
       await writeRequestLog({
         anonymousId,
         provider,
@@ -201,27 +201,24 @@ export async function POST(request: NextRequest) {
         usedUserKey: false,
         cacheHit: false,
         success: false,
-        errorCode: "FREE_QUOTA_EXHAUSTED",
+        errorCode: "ANONYMOUS_ID_REQUIRED",
         startedAt,
         normalizedProductName: normalizedQuery,
       });
 
       return NextResponse.json(
         {
-          error: "FREE_QUOTA_EXHAUSTED",
-          message:
-            "You have used your 2 free AI searches. Add your Gemini API key to continue.",
-          requiresUserKey: true,
+          error: "ANONYMOUS_ID_REQUIRED",
+          message: "Anonymous usage tracking is required for free platform AI searches.",
           meta: buildMeta({
             cacheHit: false,
             provider,
             usedPlatformKey: false,
             usedUserKey: false,
-            freeCreditsRemaining: 0,
-            requiresUserKey: true,
+            freeCreditsRemaining: freeQuotaRemaining,
           }),
         },
-        { status: 429 }
+        { status: 400 }
       );
     }
 
@@ -247,6 +244,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const consumedCredit = shouldUsePlatformKey
+      ? await consumeFreeAiCredit({ anonymousId, ipHash })
+      : null;
+
+    if (consumedCredit && !consumedCredit.allowed) {
+      await writeRequestLog({
+        anonymousId,
+        provider,
+        model,
+        usedPlatformKey: false,
+        usedUserKey: false,
+        cacheHit: false,
+        success: false,
+        errorCode: "FREE_QUOTA_EXHAUSTED",
+        startedAt,
+        normalizedProductName: normalizedQuery,
+      });
+
+      return NextResponse.json(
+        {
+          error: "FREE_QUOTA_EXHAUSTED",
+          message:
+            "You have used your 2 free AI searches. Add your Gemini API key to continue.",
+          requiresUserKey: true,
+          meta: buildMeta({
+            cacheHit: false,
+            provider,
+            usedPlatformKey: false,
+            usedUserKey: false,
+            freeCreditsRemaining: consumedCredit.freeCreditsRemaining,
+            requiresUserKey: true,
+          }),
+        },
+        { status: 429 }
+      );
+    }
+
     const pricingEngine = createPricingEngine(provider, {
       apiKey: shouldUseUserKey ? userGeminiApiKey ?? undefined : process.env.GEMINI_API_KEY,
       cacheMode: "write-only",
@@ -269,7 +303,7 @@ export async function POST(request: NextRequest) {
           provider,
           usedPlatformKey: shouldUsePlatformKey,
           usedUserKey: shouldUseUserKey,
-          freeCreditsRemaining: freeQuotaRemaining,
+          freeCreditsRemaining: consumedCredit?.freeCreditsRemaining ?? freeQuotaRemaining,
           lastCheckedAt: lastCheckedAtFromCache(cached.stale),
         });
 
@@ -310,13 +344,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: errorMessage }, { status });
     }
 
-    const consumedPlatformCredit = shouldUsePlatformKey && result.source === "fresh_ai";
-    const finalUsage = consumedPlatformCredit
-      ? await incrementFreeAiUsage({ anonymousId, ipHash })
-      : {
-          freeCreditsUsed: FREE_AI_CREDITS - freeQuotaRemaining,
-          freeCreditsRemaining: shouldUseMock ? FREE_AI_CREDITS : freeQuotaRemaining,
-        };
+    const finalUsage = consumedCredit ?? {
+      freeCreditsUsed: FREE_AI_CREDITS - freeQuotaRemaining,
+      freeCreditsRemaining: shouldUseMock ? FREE_AI_CREDITS : freeQuotaRemaining,
+    };
 
     const item = createWishlistItem(result.product);
     const meta = buildMeta({

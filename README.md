@@ -34,6 +34,7 @@ For the full product experience, create `.env.local` with:
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+IP_HASH_SECRET=your-random-ip-hash-secret
 AI_PROVIDER=gemini
 GEMINI_API_KEY=your-gemini-api-key
 GEMINI_MODEL=gemini-2.5-flash-lite
@@ -54,11 +55,38 @@ User-provided API keys are not stored server-side. They are stored only in brows
 
 Cached pricing results do not consume quota.
 
+Platform credits are consumed before external AI execution. This intentionally favors quota protection over perfect user fairness.
+
 For local demos without an AI key:
 
 ```bash
 AI_PROVIDER=mock
 ```
+
+## Database Migrations
+
+This project uses Supabase SQL migrations. Existing `001`-`005` migrations should not be renamed if they have already been applied remotely.
+
+Create new timestamped migrations with:
+
+```bash
+npm run db:migration:new -- migration_name
+```
+
+Before applying migrations remotely, inspect migration history:
+
+```bash
+npm run db:list
+```
+
+If older migrations were applied manually and are missing from Supabase migration history, use `supabase migration repair` to mark them applied before pushing. Then dry-run and push:
+
+```bash
+npm run db:push:dry
+npm run db:push
+```
+
+Use `npm run db:reset` only for local development. Never run `supabase db reset --linked` or `supabase db reset --db-url` against production.
 
 ## Architecture Highlights
 
