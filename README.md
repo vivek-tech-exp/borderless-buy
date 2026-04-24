@@ -35,11 +35,13 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 SUPABASE_SECRET_KEY=your-secret-key
 GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL=gemini-2.5-flash-lite
 ```
 
 Notes:
 - Without Supabase environment variables, the app still builds, but sign-in and synced wishlists are unavailable.
 - Without a pricing provider key, product resolution and price lookup features will be limited.
+- `GEMINI_MODEL` defaults to `gemini-2.5-flash-lite`, which is the intended free-tier production model.
 
 ## Quality Checks
 ```bash

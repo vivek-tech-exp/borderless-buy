@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "integration:test": "node scripts/integration.mjs",
-    "test": "node tests/simple-test.js",
+    "test": "node tests/simple-test.js && npm run test:product-query",
+    "test:product-query": "node --no-warnings --experimental-strip-types tests/product-query-normalization.test.ts",
     "test:verbose": "node tests/simple-test.js",
     "build": "next build",
     "start": "next start",

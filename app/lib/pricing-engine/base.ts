@@ -1,19 +1,27 @@
 import type { Product } from "@/types";
 import { createLogger, type Logger } from "@/app/lib/logger";
 
+export type PricingSource = "cache" | "fresh_ai" | "stale_cache";
+
+type PricingMetadata = {
+  normalizedQuery: string;
+  source?: PricingSource;
+  model?: string;
+  prompt?: string;
+  cacheAgeSeconds?: number;
+};
+
 /**
  * Base interface for pricing engines.
  * Implementations define how to fetch and validate pricing data from various LLM providers.
  */
 export type PricingResult =
-  | {
+  | (PricingMetadata & {
       product: Product;
-      prompt: string;
-    }
-  | {
+    })
+  | (PricingMetadata & {
       error: string;
-      prompt: string;
-    };
+    });
 
 export interface PricingEngine {
   /**
@@ -34,7 +42,30 @@ export abstract class BasePricingEngine implements PricingEngine {
     this.logger = createLogger(this.constructor.name);
   }
 
-  abstract resolveProductPricing(query: string): Promise<PricingResult | null>;
+  private pendingRequests = new Map<string, Promise<PricingResult | null>>();
+
+  /**
+   * Resolve a product query with built-in deduplication for concurrent identical requests.
+   */
+  async resolveProductPricing(query: string): Promise<PricingResult | null> {
+    const key = query.trim().toLowerCase();
+    const existing = this.pendingRequests.get(key);
+    if (existing) {
+      this.log("Joining existing in-flight request", { query: key });
+      return existing;
+    }
+
+    const promise = this.performResolveProductPricing(query);
+    this.pendingRequests.set(key, promise);
+
+    try {
+      return await promise;
+    } finally {
+      this.pendingRequests.delete(key);
+    }
+  }
+
+  protected abstract performResolveProductPricing(query: string): Promise<PricingResult | null>;
 
   /**
    * Validate price to reject placeholders and invalid values.

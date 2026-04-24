@@ -1,78 +1,62 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  getAuthErrorMessage,
+  getAuthRedirectUrl,
+  setConfigMessage,
+  type AuthUserChangeHandler,
+  useSupabaseAuthUser,
+} from "@/app/lib/auth-client";
 import { getSupabaseConfigError, isSupabaseConfigured, supabase } from "@/app/lib/supabase";
 
-export function AuthForm({ onUserChange }: { onUserChange?: (user: any) => void } = {}) {
+type AuthFormProps = {
+  onUserChange?: AuthUserChangeHandler;
+};
+
+export function AuthForm({ onUserChange }: Readonly<AuthFormProps> = {}) {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const user = useSupabaseAuthUser({ onUserChange });
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
       setMessage(getSupabaseConfigError());
-      return;
+    } else {
+      setMessage(null);
     }
-
-    let mounted = true;
-    async function init() {
-      const { data } = await supabase.auth.getSession();
-      if (!mounted) return;
-      const currentUser = data.session?.user ?? null;
-      setUser(currentUser);
-      onUserChange?.(currentUser);
-    }
-    init();
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      onUserChange?.(currentUser);
-    });
-
-    return () => {
-      mounted = false;
-      sub.subscription.unsubscribe();
-    };
-  }, [onUserChange]);
+  }, []);
 
   async function signIn() {
-    if (!isSupabaseConfigured) {
-      setMessage(getSupabaseConfigError());
+    if (setConfigMessage(setMessage, getSupabaseConfigError())) {
       return;
     }
     if (!email) return setMessage("Oops! Please enter your email.");
     setMessage(null);
     setLoading(true);
     try {
-      const redirectUrl = globalThis.location === undefined
-        ? undefined
-        : `${globalThis.location.origin}/api/auth/callback`;
-      
-      const { error } = await supabase.auth.signInWithOtp({ 
+      const { error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          emailRedirectTo: redirectUrl,
-        }
+          emailRedirectTo: getAuthRedirectUrl(),
+        },
       });
       if (error) throw error;
       setMessage("Check your email! Click the link to sign in.");
       setEmail("");
-    } catch (err: any) {
-      setMessage(err?.message ?? String(err));
+    } catch (error: unknown) {
+      setMessage(getAuthErrorMessage(error));
     } finally {
       setLoading(false);
     }
   }
 
   async function signOut() {
-    if (!isSupabaseConfigured) {
-      setMessage(getSupabaseConfigError());
+    if (setConfigMessage(setMessage, getSupabaseConfigError())) {
       return;
     }
     await supabase.auth.signOut();
-    setUser(null);
   }
 
   if (user) {

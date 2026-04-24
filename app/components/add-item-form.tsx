@@ -3,13 +3,15 @@
 import { useState } from "react";
 import { Button } from "@/app/components/ui/button";
 import { Input } from "@/app/components/ui/input";
+import { hasDuplicateWishlistQuery, normalizeProductQuery } from "@/app/lib/product-query";
 import type { WishlistItem } from "@/types";
 
 interface AddItemFormProps {
+  items: WishlistItem[];
   onAdd: (item: WishlistItem, prompt?: string) => void;
 }
 
-export function AddItemForm({ onAdd }: Readonly<AddItemFormProps>) {
+export function AddItemForm({ items, onAdd }: Readonly<AddItemFormProps>) {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,6 +20,13 @@ export function AddItemForm({ onAdd }: Readonly<AddItemFormProps>) {
     e.preventDefault();
     const q = query.trim();
     if (!q) return;
+
+    const normalizedQuery = normalizeProductQuery(q);
+    if (hasDuplicateWishlistQuery(items, normalizedQuery)) {
+      setError("That item is already in your plan.");
+      return;
+    }
+
     setError(null);
     setLoading(true);
     try {

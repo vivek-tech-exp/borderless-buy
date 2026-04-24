@@ -33,6 +33,8 @@ const LOCAL_SELECTED_KEY = "borderless-buy-selected-items";
 const VIEW_MODE_KEY = "borderless-buy-view-mode";
 const MAX_INCOME_VALUE = 99_999_999;
 const RETRY_DELAYS_MS = [100, 200] as const;
+const GEMINI_PROMPT_DEBUG_ENABLED =
+  process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_DEBUG_GEMINI_PROMPT === "1";
 
 function clearGuestStorage() {
   globalThis.localStorage.removeItem(LOCAL_WISHLIST_KEY);
@@ -853,27 +855,29 @@ function DashboardPageView(props: Readonly<{
             {/* Theme switcher */}
             <ThemeSwitcher />
             {/* Info button (desktop only - dev tool) */}
-            <button
-              type="button"
-              onClick={() => setShowPromptModal(true)}
-              className="hidden sm:flex shrink-0 rounded-full p-2 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-secondary)]"
-              title="View last Gemini prompt"
-              aria-label="View last Gemini prompt"
-            >
-              <svg
-                className="h-5 w-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            {GEMINI_PROMPT_DEBUG_ENABLED && (
+              <button
+                type="button"
+                onClick={() => setShowPromptModal(true)}
+                className="hidden sm:flex shrink-0 rounded-full p-2 text-[var(--text-tertiary)] transition-colors hover:bg-[var(--bg-secondary)] hover:text-[var(--text-secondary)]"
+                title="View last Gemini prompt"
+                aria-label="View last Gemini prompt"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </button>
+                <svg
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
 
@@ -932,7 +936,7 @@ function DashboardPageView(props: Readonly<{
       </header>
 
       <section className="mb-12">
-        <AddItemForm onAdd={handleAdd} />
+        <AddItemForm items={items} onAdd={handleAdd} />
       </section>
 
       {items.length > 0 && (
@@ -1079,7 +1083,7 @@ function DashboardPageView(props: Readonly<{
         setSelectedCompareCode={setSelectedCompareCode}
       />
 
-      {showPromptModal && (
+      {GEMINI_PROMPT_DEBUG_ENABLED && showPromptModal && (
         <PromptInfoModal
           prompt={lastPrompt}
           onClose={() => setShowPromptModal(false)}

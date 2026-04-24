@@ -1,5 +1,5 @@
-import type { Product } from "@/types";
-import { BasePricingEngine } from "./base";
+import { normalizeProductQuery } from "@/app/lib/product-query";
+import { BasePricingEngine, type PricingResult } from "./base";
 
 /**
  * OpenAI-based pricing engine (GPT-4, GPT-4o, etc.)
@@ -16,14 +16,17 @@ export class OpenAIPricingEngine extends BasePricingEngine {
     this.apiKey = apiKey;
   }
 
-  async resolveProductPricing(
+  async performResolveProductPricing(
     query: string
-  ): Promise<{ product: Product; prompt: string } | { error: string; prompt: string } | null> {
+  ): Promise<PricingResult | null> {
     this.error("OpenAI engine not yet implemented. Please use Gemini or Perplexity.");
     this.log("OpenAI engine stub invoked", {
       query,
       hasApiKey: this.apiKey.length > 0,
     });
-    return null;
+    return {
+      error: "OpenAI pricing engine is not implemented. Use Gemini instead.",
+      normalizedQuery: normalizeProductQuery(query),
+    };
   }
 }

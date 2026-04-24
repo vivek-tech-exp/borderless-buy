@@ -1,7 +1,9 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, SchemaType, type ResponseSchema } from "@google/generative-ai";
+import { getPricingCacheEntry, upsertPricingCacheEntry } from "@/app/lib/pricing-cache";
+import { isMeaningfulProductQuery, normalizeProductQuery } from "@/app/lib/product-query";
 import type { CountryPricing, Product } from "@/types";
 import { COUNTRY_CODES } from "@/types";
-import { BasePricingEngine } from "./base";
+import { BasePricingEngine, type PricingResult } from "./base";
 
 const VALID_STOCK_STATUSES = new Set<NonNullable<CountryPricing["stockStatus"]>>([
   "in_stock",
@@ -10,149 +12,302 @@ const VALID_STOCK_STATUSES = new Set<NonNullable<CountryPricing["stockStatus"]>>
   "unknown",
 ]);
 
+const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+const GEMINI_PROMPT_DEBUG_ENABLED =
+  process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_DEBUG_GEMINI_PROMPT === "1";
+const GEMINI_TOKEN_BUDGET = 1800;
+
+const SYSTEM_INSTRUCTION = [
+  "You normalize a shopping query into one product and compare new-item pricing across 10 markets.",
+  "Use only current mainstream retail listings and return strict JSON.",
+  "If the query is gibberish, non-commercial, or too vague to resolve to one real product, return status=error.",
+  "For vague but valid shopping intent, choose one mainstream current-generation product and explain briefly in selection_rationale.",
+  "Match a single baseline configuration consistently across all markets.",
+  "If an exact match is unavailable in a market, choose the nearest superior variant, never an inferior one, and note the difference in notes.",
+  "Return raw local prices only. Do not convert currency.",
+  "Prefer direct retailer links. If none exists, use a strong retailer search results URL for that market.",
+  "Keep notes empty unless a variant mismatch, stock caveat, or link limitation matters.",
+].join(" ");
+
+const COUNTRY_PRICING_SCHEMA: ResponseSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    price: {
+      type: SchemaType.NUMBER,
+      nullable: true,
+    },
+    currency: { type: SchemaType.STRING },
+    priceSource: { type: SchemaType.STRING },
+    buyingLink: { type: SchemaType.STRING },
+    stockStatus: {
+      type: SchemaType.STRING,
+      enum: ["in_stock", "out_of_stock", "preorder", "unknown"],
+    },
+    notes: { type: SchemaType.STRING },
+  },
+  required: ["price", "currency", "priceSource", "buyingLink", "stockStatus", "notes"],
+};
+
+const GEMINI_RESPONSE_SCHEMA: ResponseSchema = {
+  type: SchemaType.OBJECT,
+  properties: {
+    status: {
+      type: SchemaType.STRING,
+      enum: ["success", "error"],
+    },
+    message: { type: SchemaType.STRING },
+    id: { type: SchemaType.STRING },
+    name: { type: SchemaType.STRING },
+    displayName: { type: SchemaType.STRING },
+    category: {
+      type: SchemaType.STRING,
+      enum: ["tech", "vehicle", "other"],
+    },
+    carryOnFriendly: { type: SchemaType.BOOLEAN },
+    baselineConfiguration: { type: SchemaType.STRING },
+    is_vague_query: { type: SchemaType.BOOLEAN },
+    selection_rationale: { type: SchemaType.STRING },
+    pricing: {
+      type: SchemaType.OBJECT,
+      properties: {
+        US: COUNTRY_PRICING_SCHEMA,
+        UK: COUNTRY_PRICING_SCHEMA,
+        IN: COUNTRY_PRICING_SCHEMA,
+        AE: COUNTRY_PRICING_SCHEMA,
+        CN: COUNTRY_PRICING_SCHEMA,
+        KR: COUNTRY_PRICING_SCHEMA,
+        JP: COUNTRY_PRICING_SCHEMA,
+        DE: COUNTRY_PRICING_SCHEMA,
+        AU: COUNTRY_PRICING_SCHEMA,
+        HK: COUNTRY_PRICING_SCHEMA,
+      },
+      required: [...COUNTRY_CODES],
+    },
+  },
+  required: ["status"],
+};
+
+function buildUserPrompt(normalizedQuery: string): string {
+  return [
+    `Query: "${normalizedQuery}"`,
+    "Markets: US, UK, IN, AE, CN, KR, JP, DE, AU, HK.",
+    "Output only JSON matching the schema.",
+  ].join("\n");
+}
+
+function buildDebugPrompt(systemInstruction: string, userPrompt: string): string {
+  return `System:\n${systemInstruction}\n\nUser:\n${userPrompt}`;
+}
+
+function looksLikeRateLimitError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const lowered = message.toLowerCase();
+  return lowered.includes("429") || lowered.includes("resource_exhausted") || lowered.includes("rate limit");
+}
+
 /**
  * Gemini-based pricing engine using Google's Generative AI API.
  */
 export class GeminiPricingEngine extends BasePricingEngine {
   private readonly genAI: GoogleGenerativeAI;
-  private readonly models = [
-    "gemini-3.0-flash",      // Best & Fresh Quota
-    "gemini-3.5-flash",      // Best & Fresh Quota
-    "gemini-2.5-flash-lite", // Backup: Fast & Fresh Quota
-    "gemini-2.5-flash",      // Fallback
-  ] as const;
+  private readonly modelName: string;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, modelName = DEFAULT_GEMINI_MODEL) {
     super();
     if (!apiKey) {
       throw new Error("Gemini API key is required");
     }
     this.genAI = new GoogleGenerativeAI(apiKey);
+    this.modelName = modelName;
   }
 
-  async resolveProductPricing(
-    query: string
-  ): Promise<{ product: Product; prompt: string } | { error: string; prompt: string } | null> {
-    const prompt = this.buildPrompt(query);
-    this.log("Starting product resolution", { query });
+  async performResolveProductPricing(query: string): Promise<PricingResult | null> {
+    const normalizedQuery = normalizeProductQuery(query);
 
-    for (const modelName of this.models) {
-      try {
-        this.log("Attempting model", { model: modelName, query });
-        const model = this.genAI.getGenerativeModel({
-          model: modelName,
-          generationConfig: {
-            responseMimeType: "application/json",
-          },
+    if (!isMeaningfulProductQuery(normalizedQuery)) {
+      return {
+        error: "Enter a real product name to compare prices.",
+        normalizedQuery,
+      };
+    }
+
+    const cached = await getPricingCacheEntry(normalizedQuery);
+    if (cached.fresh) {
+      this.log("Serving pricing from fresh cache", {
+        normalizedQuery,
+        model: cached.fresh.model,
+        cacheAgeSeconds: cached.fresh.ageSeconds,
+      });
+      return {
+        product: cached.fresh.product,
+        normalizedQuery,
+        model: cached.fresh.model,
+        source: "cache",
+        cacheAgeSeconds: cached.fresh.ageSeconds,
+      };
+    }
+
+    const userPrompt = buildUserPrompt(normalizedQuery);
+    const prompt = GEMINI_PROMPT_DEBUG_ENABLED
+      ? buildDebugPrompt(SYSTEM_INSTRUCTION, userPrompt)
+      : undefined;
+
+    this.log("Starting Gemini product resolution", {
+      query,
+      normalizedQuery,
+      model: this.modelName,
+    });
+
+    try {
+      const model = this.genAI.getGenerativeModel({
+        model: this.modelName,
+        systemInstruction: SYSTEM_INSTRUCTION,
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: GEMINI_RESPONSE_SCHEMA,
+          temperature: 0,
+          candidateCount: 1,
+          maxOutputTokens: 2200,
+        },
+      });
+
+      await this.logPromptBudget(model, userPrompt, normalizedQuery);
+
+      const genResult = await model.generateContent(userPrompt);
+      const text = genResult.response.text();
+
+      if (!text) {
+        this.warn("Gemini returned an empty response", {
+          normalizedQuery,
+          model: this.modelName,
         });
-
-        const genResult = await model.generateContent(prompt);
-        const text = genResult.response.text();
-
-        if (!text) {
-          this.warn(`Model returned empty response`, {
-            model: modelName,
-            query,
-          });
-          continue;
-        }
-
-        this.log("Model succeeded", { model: modelName, query });
-
-        // Parse and validate response
-        const parsed = JSON.parse(text) as Record<string, unknown>;
-        const parsedResult = this.parseProductResponse(parsed, query);
-
-        if (!parsedResult) {
-          this.warn("Failed to parse product from response", {
-            model: modelName,
-            query,
-          });
-          continue;
-        }
-
-        if ("error" in parsedResult) {
-          return { error: parsedResult.error, prompt };
-        }
-
-        return { product: parsedResult.product, prompt };
-      } catch (err) {
-        this.error(
-          `Model ${modelName} failed during API call or parsing`,
-          err instanceof Error ? err : new Error(String(err))
-        );
-        // Continue to next model
+        return this.useStaleCacheOrNull({
+          cached,
+          normalizedQuery,
+          prompt,
+        });
       }
-    }
 
-    this.error("All Gemini models exhausted", "No models succeeded");
-    return null;
+      const parsed = JSON.parse(text) as Record<string, unknown>;
+      const parsedResult = this.parseProductResponse(parsed, normalizedQuery);
+
+      if (!parsedResult) {
+        this.warn("Gemini response could not be parsed into a product", {
+          normalizedQuery,
+          model: this.modelName,
+        });
+        return this.useStaleCacheOrNull({
+          cached,
+          normalizedQuery,
+          prompt,
+        });
+      }
+
+      if ("error" in parsedResult) {
+        return {
+          error: parsedResult.error,
+          normalizedQuery,
+          model: this.modelName,
+          prompt,
+        };
+      }
+
+      const cachedProduct = await upsertPricingCacheEntry({
+        normalizedQuery,
+        rawQuery: query.trim(),
+        product: parsedResult.product,
+        model: this.modelName,
+      });
+
+      return {
+        product: cachedProduct?.product ?? parsedResult.product,
+        normalizedQuery,
+        model: cachedProduct?.model ?? this.modelName,
+        source: "fresh_ai",
+        cacheAgeSeconds: cachedProduct?.ageSeconds ?? 0,
+        prompt,
+      };
+    } catch (error) {
+      this.error(
+        `Gemini model ${this.modelName} failed during API call or parsing`,
+        error instanceof Error ? error : new Error(String(error))
+      );
+
+      if (cached.stale && looksLikeRateLimitError(error)) {
+        return {
+          product: cached.stale.product,
+          normalizedQuery,
+          model: cached.stale.model,
+          source: "stale_cache",
+          cacheAgeSeconds: cached.stale.ageSeconds,
+          prompt,
+        };
+      }
+
+      if (cached.stale) {
+        return {
+          product: cached.stale.product,
+          normalizedQuery,
+          model: cached.stale.model,
+          source: "stale_cache",
+          cacheAgeSeconds: cached.stale.ageSeconds,
+          prompt,
+        };
+      }
+
+      return null;
+    }
   }
 
-  private buildPrompt(query: string): string {
-    return `You are a Precision Pricing Engine. Your goal is strict "Apples-to-Apples" comparison across 10 global regions.
-
-USER QUERY: "${query}"
-
-### PHASE 1: SANITY CHECK & INTENT RECOGNITION
-1. Analyze the query. Is it a valid commercial product or a clear product intent?
-2. If the query is gibberish (e.g. "asdf"), random text, or a non-physical concept (e.g. "love", "mathematics"), return an error response.
-3. Vague intent queries (e.g. "best camera for YouTube") ARE valid. Select the single best mainstream product and proceed.
-
-### PHASE 2: BASELINE DEFINITION (If valid)
-1. If the query is vague or generic (e.g., "MacBook"), select the most popular current-generation base model.
-2. Define a strict Baseline Configuration (Model, Storage, RAM, Color if relevant).
-
-### PHASE 3: PRICING EXTRACTION RULES
-- Condition: NEW items only. No Refurbished/Used.
-- Strict Matching: Search for the Baseline Configuration.
-- Fallback Logic: If the EXACT config is unavailable in a region, choose the next closest superior config and note the difference in "notes". Do NOT select an inferior model.
-- Currency: Return the RAW local currency number (e.g., 148000 for JPY). Do NOT convert.
-- Links: If you cannot find a direct verified product link, construct a high-quality Search Result URL for that specific store. Do not hallucinate deep links.
-
-### REGIONAL SOURCES (Prioritize these):
-* US: Amazon.com, Apple.com, Best Buy
-* UK: Amazon.co.uk, Apple.co.uk, John Lewis
-* IN: Amazon.in, Flipkart, Apple India
-* AE: Noon.com, Amazon.ae, Carrefour
-* CN: JD.com, Tmall (provide search page if login required)
-* KR: Coupang, Samsung Korea, LG Korea
-* JP: Amazon.co.jp, Rakuten, BIC Camera
-* DE: Amazon.de, MediaMarkt, Currys
-* AU: JB Hi-Fi, Harvey Norman, Amazon.au
-* HK: Aeon.com.hk, Fortress, Watsons Electronics
-
-### OUTPUT FORMAT (Strict JSON, No Markdown)
-If Invalid:
-{
-  "status": "error",
-  "message": "Query appears to be gibberish or not a specific product."
-}
-
-If Valid:
-{
-  "status": "success",
-  "id": "kebab-case-product-name",
-  "name": "Full product name",
-  "displayName": "Clear UI Name (e.g. Sony A7 IV Body Only)",
-  "category": "tech" | "vehicle" | "other",
-  "carryOnFriendly": true or false,
-  "baselineConfiguration": "Full specs used for comparison",
-  "is_vague_query": true or false,
-  "selection_rationale": "Short reason for selection if vague (optional)",
-  "pricing": {
-    "US": {
-      "price": number or null,
-      "currency": "USD",
-      "priceSource": "e.g. Apple.com",
-      "buyingLink": "https://...",
-      "stockStatus": "in_stock" | "out_of_stock" | "preorder" | "unknown",
-      "notes": ""
+  private async logPromptBudget(
+    model: ReturnType<GoogleGenerativeAI["getGenerativeModel"]>,
+    userPrompt: string,
+    normalizedQuery: string
+  ) {
+    if (!GEMINI_PROMPT_DEBUG_ENABLED) {
+      return;
     }
-    // ... repeat for all regions
+
+    try {
+      const tokenCount = await model.countTokens({
+        generateContentRequest: {
+          systemInstruction: { role: "system", parts: [{ text: SYSTEM_INSTRUCTION }] },
+          contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+        },
+      });
+
+      if (tokenCount.totalTokens > GEMINI_TOKEN_BUDGET) {
+        this.warn("Gemini prompt budget exceeded", {
+          normalizedQuery,
+          tokenCount: tokenCount.totalTokens,
+          tokenBudget: GEMINI_TOKEN_BUDGET,
+        });
+      }
+    } catch (error) {
+      this.warn("Gemini token budget check failed", {
+        normalizedQuery,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
-}
-`; 
+
+  private useStaleCacheOrNull(params: {
+    cached: Awaited<ReturnType<typeof getPricingCacheEntry>>;
+    normalizedQuery: string;
+    prompt?: string;
+  }): PricingResult | null {
+    if (!params.cached.stale) {
+      return null;
+    }
+
+    return {
+      product: params.cached.stale.product,
+      normalizedQuery: params.normalizedQuery,
+      model: params.cached.stale.model,
+      source: "stale_cache",
+      cacheAgeSeconds: params.cached.stale.ageSeconds,
+      prompt: params.prompt,
+    };
   }
 
   private parseProductResponse(
@@ -172,16 +327,16 @@ If Valid:
 
       const product = this.buildProduct(parsed, query, pricing);
 
-      this.log("Successfully parsed product response", {
+      this.log("Successfully parsed Gemini pricing response", {
         productName: product.displayName,
         query,
       });
 
       return { product };
-    } catch (err) {
+    } catch (error) {
       this.error(
-        "Failed to parse product response",
-        err instanceof Error ? err : new Error(String(err))
+        "Failed to parse Gemini product response",
+        error instanceof Error ? error : new Error(String(error))
       );
       return null;
     }
