@@ -32,16 +32,44 @@ For the full product experience, create `.env.local` with:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
-SUPABASE_SECRET_KEY=your-secret-key
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+AI_PROVIDER=gemini
 GEMINI_API_KEY=your-gemini-api-key
 GEMINI_MODEL=gemini-2.5-flash-lite
 ```
 
 Notes:
 - Without Supabase environment variables, the app still builds, but sign-in and synced wishlists are unavailable.
-- Without a pricing provider key, product resolution and price lookup features will be limited.
+- Without a pricing provider key, use `AI_PROVIDER=mock` for local demos.
 - `GEMINI_MODEL` defaults to `gemini-2.5-flash-lite`, which is the intended free-tier production model.
+
+## AI Usage Strategy
+
+Borderless Buy uses a quota-aware AI access model.
+
+The app can use a platform Gemini API key for a small number of free searches. After the free quota is exhausted, users can provide their own Gemini API key.
+
+User-provided API keys are not stored server-side. They are stored only in browser storage and passed only for the current AI request.
+
+Cached pricing results do not consume quota.
+
+For local demos without an AI key:
+
+```bash
+AI_PROVIDER=mock
+```
+
+## Architecture Highlights
+
+- Provider-based pricing engine
+- Gemini provider
+- Mock provider for local demo mode
+- Supabase-backed usage tracking
+- Supabase-backed pricing cache
+- Browser-only bring-your-own-key flow
+- AI request logging
+- Graceful fallback when AI is unavailable
 
 ## Quality Checks
 ```bash

@@ -8,7 +8,8 @@ const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const STALE_FALLBACK_MS = 30 * 24 * 60 * 60 * 1000;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const supabaseSecret = process.env.SUPABASE_SECRET_KEY ?? "";
+const supabaseSecret =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY ?? "";
 
 export const isPricingCacheConfigured = Boolean(supabaseUrl && supabaseSecret);
 

@@ -1,55 +1,48 @@
 import type { PricingEngine } from "./base";
-import { GeminiPricingEngine } from "./gemini";
-import { OpenAIPricingEngine } from "./openai";
-import { PerplexityPricingEngine } from "./perplexity";
+import { DEFAULT_GEMINI_MODEL, GeminiPricingEngine } from "./gemini";
+import { MockPricingProvider } from "./mock";
 
-export type PricingEngineType = "gemini" | "openai" | "perplexity";
+export type PricingProviderType = "gemini" | "mock";
 
-/**
- * Factory to create and return the appropriate pricing engine based on environment configuration.
- * Defaults to Gemini if not specified.
- *
- * Environment variables:
- * - PRICING_ENGINE: "gemini" | "openai" | "perplexity" (default: "gemini")
- * - GEMINI_API_KEY: Required if engine is "gemini"
- * - OPENAI_API_KEY: Required if engine is "openai"
- * - PERPLEXITY_API_KEY: Required if engine is "perplexity"
- */
-export function createPricingEngine(): PricingEngine {
-  const engineType = (
-    process.env.PRICING_ENGINE || "gemini"
-  ).toLowerCase() as PricingEngineType;
+export type CreatePricingEngineOptions = {
+  apiKey?: string;
+  cacheMode?: "read-write" | "write-only" | "none";
+};
 
-  switch (engineType) {
-    case "openai":
-      return new OpenAIPricingEngine(process.env.OPENAI_API_KEY || "");
+export function getConfiguredPricingProvider(): PricingProviderType {
+  const provider = (process.env.AI_PROVIDER || process.env.PRICING_ENGINE || "gemini").toLowerCase();
+  return provider === "mock" ? "mock" : "gemini";
+}
 
-    case "perplexity":
-      return new PerplexityPricingEngine(process.env.PERPLEXITY_API_KEY || "");
+export function getConfiguredPricingModel(provider: PricingProviderType): string {
+  return provider === "gemini" ? DEFAULT_GEMINI_MODEL : "mock-static-v1";
+}
 
+export function createPricingEngine(
+  provider: PricingProviderType = getConfiguredPricingProvider(),
+  options: CreatePricingEngineOptions = {}
+): PricingEngine {
+  switch (provider) {
+    case "mock":
+      return new MockPricingProvider();
     case "gemini":
     default:
-      return new GeminiPricingEngine(process.env.GEMINI_API_KEY || "");
+      return new GeminiPricingEngine(
+        options.apiKey ?? process.env.GEMINI_API_KEY ?? "",
+        DEFAULT_GEMINI_MODEL,
+        { cacheMode: options.cacheMode }
+      );
   }
 }
 
-/**
- * Singleton instance of the pricing engine.
- * Retrieved once and reused throughout the application.
- */
 let engineInstance: PricingEngine | null = null;
 
-/**
- * Get the singleton pricing engine instance.
- */
 export function getPricingEngine(): PricingEngine {
   engineInstance ??= createPricingEngine();
   return engineInstance;
 }
 
-// Re-export types and implementations for downstream use
 export type { PricingEngine } from "./base";
 export { BasePricingEngine } from "./base";
-export { GeminiPricingEngine } from "./gemini";
-export { OpenAIPricingEngine } from "./openai";
-export { PerplexityPricingEngine } from "./perplexity";
+export { GeminiPricingEngine, GeminiPricingProvider } from "./gemini";
+export { MockPricingProvider } from "./mock";
