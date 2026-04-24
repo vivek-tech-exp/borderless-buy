@@ -1,5 +1,9 @@
 # Borderless Buy
 
+AI-assisted pricing estimate and comparison engine.
+
+## Overview
+
 Borderless Buy helps people compare wishlist prices across countries so they can decide where to buy each item, what to buy locally, and what may be worth buying abroad.
 
 ## Live Site
@@ -125,14 +129,14 @@ npm run security:gitleaks:repo
 
 ## Documentation
 
-Start with the documentation index: [docs/README.md](/Users/vivekmankonda/Documents/GitHub/borderless-buy/docs/README.md)
+Start with the documentation index: [docs/README.md](docs/README.md)
 
 Direct links:
-- Product overview: [docs/PRD.md](/Users/vivekmankonda/Documents/GitHub/borderless-buy/docs/PRD.md)
-- Technical setup: [docs/TECH_SETUP.md](/Users/vivekmankonda/Documents/GitHub/borderless-buy/docs/TECH_SETUP.md)
-- Codebase tour: [docs/PROJECT_TOUR.md](/Users/vivekmankonda/Documents/GitHub/borderless-buy/docs/PROJECT_TOUR.md)
-- Pricing provider architecture: [docs/PRICING_ENGINE_ARCHITECTURE.md](/Users/vivekmankonda/Documents/GitHub/borderless-buy/docs/PRICING_ENGINE_ARCHITECTURE.md)
-- Privacy and data handling: [docs/SECURITY_AUDIT.md](/Users/vivekmankonda/Documents/GitHub/borderless-buy/docs/SECURITY_AUDIT.md)
-- Data reliability notes: [docs/DATA_INTEGRITY_ISSUES.md](/Users/vivekmankonda/Documents/GitHub/borderless-buy/docs/DATA_INTEGRITY_ISSUES.md)
-- Design system: [docs/DESIGN_SYSTEM.md](/Users/vivekmankonda/Documents/GitHub/borderless-buy/docs/DESIGN_SYSTEM.md)
-- Contribution guide: [docs/CONTRIBUTING.md](/Users/vivekmankonda/Documents/GitHub/borderless-buy/docs/CONTRIBUTING.md)
+- Product overview: [docs/PRD.md](docs/PRD.md)
+- Technical setup: [docs/TECH_SETUP.md](docs/TECH_SETUP.md)
+- Codebase tour: [docs/PROJECT_TOUR.md](docs/PROJECT_TOUR.md)
+- Pricing provider architecture: [docs/PRICING_ENGINE_ARCHITECTURE.md](docs/PRICING_ENGINE_ARCHITECTURE.md)
+- Privacy and data handling: [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md)
+- Data reliability notes: [docs/DATA_INTEGRITY_ISSUES.md](docs/DATA_INTEGRITY_ISSUES.md)
+- Design system: [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)
+- Contribution guide: [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)

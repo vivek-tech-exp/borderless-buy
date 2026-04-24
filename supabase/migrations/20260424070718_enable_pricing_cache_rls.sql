@@ -1,0 +1,1 @@
+ALTER TABLE public.pricing_cache ENABLE ROW LEVEL SECURITY;
