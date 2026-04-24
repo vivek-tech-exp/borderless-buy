@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import jwt from "jsonwebtoken";
 import type { WishlistItem } from "@/types";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const SUPABASE_ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
 const SUPABASE_SECRET =
   process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY ?? "";
 
@@ -37,20 +38,22 @@ function extractBearerToken(request: NextRequest): string | null {
   return authHeader.startsWith("Bearer ") ? authHeader.slice(7).trim() : authHeader;
 }
 
-function extractUserIdFromToken(token: string): string | null {
-  const decoded = jwt.decode(token);
-  if (!decoded || typeof decoded === "string") return null;
-  return typeof decoded.sub === "string" ? decoded.sub : null;
-}
-
-function getAuthorizedUserId(request: NextRequest): { userId: string } | { response: NextResponse } {
+async function getAuthorizedUserId(request: NextRequest): Promise<{ userId: string } | { response: NextResponse }> {
   const token = extractBearerToken(request);
   if (!token) return { response: errorResponse("Missing access token", 401) };
 
-  const userId = extractUserIdFromToken(token);
-  if (!userId) return { response: errorResponse("Invalid token", 401) };
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return { response: errorResponse("Internal server error", 500) };
+  }
 
-  return { userId };
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { persistSession: false },
+  });
+  const { data, error } = await supabase.auth.getUser(token);
+
+  if (error || !data.user) return { response: errorResponse("Invalid token", 401) };
+
+  return { userId: data.user.id };
 }
 
 function sanitizeTag(tag: string | null | undefined): string | null {
@@ -77,7 +80,7 @@ function makeAdminClient() {
 }
 
 export async function GET(request: NextRequest) {
-  const auth = getAuthorizedUserId(request);
+  const auth = await getAuthorizedUserId(request);
   if ("response" in auth) return auth.response;
 
   try {
@@ -109,7 +112,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = getAuthorizedUserId(request);
+  const auth = await getAuthorizedUserId(request);
   if ("response" in auth) return auth.response;
 
   try {
@@ -142,7 +145,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const auth = getAuthorizedUserId(request);
+  const auth = await getAuthorizedUserId(request);
   if ("response" in auth) return auth.response;
 
   try {
@@ -182,7 +185,7 @@ export async function DELETE(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const auth = getAuthorizedUserId(request);
+  const auth = await getAuthorizedUserId(request);
   if ("response" in auth) return auth.response;
 
   try {

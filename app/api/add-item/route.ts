@@ -130,7 +130,6 @@ export async function POST(request: NextRequest) {
     const ipHash = hashIpAddress(getRequestIp(request));
 
     logger.info("Received add-item request", {
-      query,
       normalizedQuery,
       provider,
       requestId,
@@ -287,7 +286,6 @@ export async function POST(request: NextRequest) {
     });
 
     logger.debug("Resolving product pricing", {
-      query,
       normalizedQuery,
       provider,
       requestId,
@@ -410,7 +408,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Internal server error" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
