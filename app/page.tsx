@@ -166,7 +166,7 @@ function useWishlistAuthSync(params: {
         }
       }
 
-      console.log(
+      console.info(
         `✓ Migration complete: ${successCount}/${guestItems.length} items uploaded` +
         (failureCount > 0 ? `, ${failureCount} failed` : "")
       );
