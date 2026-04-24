@@ -12,11 +12,11 @@ if (fs.existsSync(localEnv)) {
 }
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SECRET = process.env.SUPABASE_SECRET_KEY;
-const PUBLISHABLE = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY;
+const PUBLISHABLE = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
 if (!URL || !SECRET || !PUBLISHABLE) {
-  console.error('Missing required env vars: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SECRET_KEY, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
+  console.error('Missing required env vars: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, NEXT_PUBLIC_SUPABASE_ANON_KEY');
   process.exit(2);
 }
 

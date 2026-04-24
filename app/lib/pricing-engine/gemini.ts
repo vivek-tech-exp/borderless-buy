@@ -12,7 +12,7 @@ const VALID_STOCK_STATUSES = new Set<NonNullable<CountryPricing["stockStatus"]>>
   "unknown",
 ]);
 
-const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
+export const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 const GEMINI_PROMPT_DEBUG_ENABLED =
   process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_DEBUG_GEMINI_PROMPT === "1";
 const GEMINI_TOKEN_BUDGET = 1800;
@@ -111,14 +111,20 @@ function looksLikeRateLimitError(error: unknown): boolean {
 export class GeminiPricingEngine extends BasePricingEngine {
   private readonly genAI: GoogleGenerativeAI;
   private readonly modelName: string;
+  private readonly cacheMode: "read-write" | "write-only" | "none";
 
-  constructor(apiKey: string, modelName = DEFAULT_GEMINI_MODEL) {
+  constructor(
+    apiKey: string,
+    modelName = DEFAULT_GEMINI_MODEL,
+    options: { cacheMode?: "read-write" | "write-only" | "none" } = {}
+  ) {
     super();
     if (!apiKey) {
       throw new Error("Gemini API key is required");
     }
     this.genAI = new GoogleGenerativeAI(apiKey);
     this.modelName = modelName;
+    this.cacheMode = options.cacheMode ?? "read-write";
   }
 
   async performResolveProductPricing(query: string): Promise<PricingResult | null> {
@@ -131,7 +137,10 @@ export class GeminiPricingEngine extends BasePricingEngine {
       };
     }
 
-    const cached = await getPricingCacheEntry(normalizedQuery);
+    const cached =
+      this.cacheMode === "read-write"
+        ? await getPricingCacheEntry(normalizedQuery)
+        : { fresh: null, stale: null };
     if (cached.fresh) {
       this.log("Serving pricing from fresh cache", {
         normalizedQuery,
@@ -230,12 +239,15 @@ export class GeminiPricingEngine extends BasePricingEngine {
         };
       }
 
-      const cachedProduct = await upsertPricingCacheEntry({
-        normalizedQuery,
-        rawQuery: query.trim(),
-        product: parsedResult.product,
-        model: this.modelName,
-      });
+      const cachedProduct =
+        this.cacheMode === "none"
+          ? null
+          : await upsertPricingCacheEntry({
+              normalizedQuery,
+              rawQuery: query.trim(),
+              product: parsedResult.product,
+              model: this.modelName,
+            });
 
       return {
         product: cachedProduct?.product ?? parsedResult.product,
@@ -465,3 +477,5 @@ export class GeminiPricingEngine extends BasePricingEngine {
     };
   }
 }
+
+export { GeminiPricingEngine as GeminiPricingProvider };
