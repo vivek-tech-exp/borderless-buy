@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = makeAdminClient();
     const { data, error } = await supabase
-      .from("wishlist")
+      .from("onedaybaby_wishlist")
       .select("id, product, tag, created_at")
       .eq("user_id", auth.userId)
       .order("created_at", { ascending: false });
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = makeAdminClient();
-    const { error } = await supabase.from("wishlist").insert([
+    const { error } = await supabase.from("onedaybaby_wishlist").insert([
       {
         id: item.id,
         user_id: auth.userId,
@@ -156,7 +156,7 @@ export async function DELETE(request: NextRequest) {
 
     const supabase = makeAdminClient();
     const { data: existing, error: selectError } = await supabase
-      .from("wishlist")
+      .from("onedaybaby_wishlist")
       .select("id")
       .eq("id", itemId)
       .eq("user_id", auth.userId)
@@ -167,7 +167,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { error } = await supabase
-      .from("wishlist")
+      .from("onedaybaby_wishlist")
       .delete()
       .eq("id", itemId)
       .eq("user_id", auth.userId);
@@ -197,7 +197,7 @@ export async function PATCH(request: NextRequest) {
 
     const supabase = makeAdminClient();
     const { error } = await supabase
-      .from("wishlist")
+      .from("onedaybaby_wishlist")
       .update({ tag: sanitizeTag(body?.tag) })
       .eq("id", itemId)
       .eq("user_id", auth.userId);

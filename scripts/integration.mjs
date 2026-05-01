@@ -68,7 +68,7 @@ async function run() {
     console.log('Integration test succeeded — item persisted and returned by API');
 
     // Cleanup: remove wishlist row
-    await admin.from('wishlist').delete().eq('id', testItem.id);
+    await admin.from('onedaybaby_wishlist').delete().eq('id', testItem.id);
   } finally {
     console.log('Cleaning up user ...');
     await admin.auth.admin.deleteUser(user.id).catch(() => null);

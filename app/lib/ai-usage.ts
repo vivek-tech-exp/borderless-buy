@@ -98,7 +98,7 @@ export async function getAiUsageSnapshot(params: {
   }
 
   const { data, error } = await client
-    .from("ai_usage")
+    .from("onedaybaby_ai_usage")
     .select("anonymous_id, free_credits_used")
     .eq("anonymous_id", params.anonymousId)
     .maybeSingle();
@@ -184,7 +184,7 @@ export async function logAiRequest(params: AiRequestLogParams): Promise<void> {
     return;
   }
 
-  const { error } = await client.from("ai_request_logs").insert({
+  const { error } = await client.from("onedaybaby_ai_request_logs").insert({
     anonymous_id: params.anonymousId,
     provider: params.provider,
     model: params.model,
