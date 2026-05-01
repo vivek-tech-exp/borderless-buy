@@ -68,7 +68,7 @@ async function bumpCacheHitCount(normalizedQuery: string, currentCount: number) 
   }
 
   const { error } = await client
-    .from("pricing_cache")
+    .from("onedaybaby_pricing_cache")
     .update({
       hit_count: currentCount + 1,
     })
@@ -89,7 +89,7 @@ export async function getPricingCacheEntry(normalizedQuery: string): Promise<Pri
   }
 
   const { data, error } = await client
-    .from("pricing_cache")
+    .from("onedaybaby_pricing_cache")
     .select("normalized_query, raw_query, product, model, created_at, updated_at, expires_at, hit_count")
     .eq("normalized_query", normalizedQuery)
     .maybeSingle();
@@ -136,7 +136,7 @@ export async function upsertPricingCacheEntry(params: {
   const expiresAt = new Date(Date.now() + CACHE_TTL_MS).toISOString();
 
   const { data, error: upsertError } = await client
-    .from("pricing_cache")
+    .from("onedaybaby_pricing_cache")
     .upsert(
       {
         normalized_query: params.normalizedQuery,
