@@ -1,14 +1,16 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { isLoggedRoute, REQUEST_ID_HEADER, REQUEST_STARTED_HEADER } from "@/app/lib/request-logging";
 
-/**
- * Optional: Supabase auth can be wired here later (for example, refresh session or protect routes).
- * For now, all routes are public.
- */
-export function proxy(_request: NextRequest) {
-  return NextResponse.next();
+export function proxy(request: NextRequest) {
+  if (!isLoggedRoute(request.nextUrl.pathname, request.method)) return NextResponse.next();
+
+  const headers = new Headers(request.headers);
+  headers.set(REQUEST_ID_HEADER, crypto.randomUUID());
+  headers.set(REQUEST_STARTED_HEADER, String(Date.now()));
+  return NextResponse.next({ request: { headers } });
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/api/add-item", "/api/auth/callback", "/api/rates", "/api/wishlist"],
 };

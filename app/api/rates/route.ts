@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
+import { withRequestLogging } from "@/app/lib/request-logging";
 
 const RATES_URL = "https://open.er-api.com/v6/latest/USD";
 const REVALIDATE_SECONDS = 86400; // 24 hours
@@ -32,7 +33,7 @@ const getCachedRates = unstable_cache(
  * Returns FX rates (per 1 USD). Cached for 24h so conversion stays off the
  * critical path when users interact; rates are fetched at most once per day.
  */
-export async function GET() {
+async function getRates() {
   try {
     const { rates, updatedAt } = await getCachedRates();
     return NextResponse.json({
@@ -40,11 +41,12 @@ export async function GET() {
       rates,
       updatedAt,
     });
-  } catch (err) {
-    console.error("Rates API error:", err);
+  } catch {
     return NextResponse.json(
       { error: "Failed to fetch rates" },
       { status: 503 }
     );
   }
 }
+
+export const GET = withRequestLogging("/api/rates", getRates);

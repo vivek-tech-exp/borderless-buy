@@ -6,6 +6,7 @@ const logger = createLogger("PricingCache");
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const STALE_FALLBACK_MS = 30 * 24 * 60 * 60 * 1000;
+const PRICING_CACHE_TABLE = "onedaybaby_pricing_cache";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const supabaseSecret =
@@ -51,6 +52,19 @@ function getPricingCacheClient() {
   return pricingCacheClient;
 }
 
+export async function canReadPricingCache(): Promise<boolean> {
+  const client = getPricingCacheClient();
+  if (!client) return false;
+
+  const { error } = await client
+    .from(PRICING_CACHE_TABLE)
+    .select("normalized_query")
+    .limit(1)
+    .abortSignal(AbortSignal.timeout(3_000));
+
+  return !error;
+}
+
 function mapCacheHit(row: PricingCacheRow): PricingCacheHit {
   const ageMs = Math.max(Date.now() - new Date(row.updated_at).getTime(), 0);
   return {
@@ -68,7 +82,7 @@ async function bumpCacheHitCount(normalizedQuery: string, currentCount: number) 
   }
 
   const { error } = await client
-    .from("onedaybaby_pricing_cache")
+    .from(PRICING_CACHE_TABLE)
     .update({
       hit_count: currentCount + 1,
     })
@@ -89,7 +103,7 @@ export async function getPricingCacheEntry(normalizedQuery: string): Promise<Pri
   }
 
   const { data, error } = await client
-    .from("onedaybaby_pricing_cache")
+    .from(PRICING_CACHE_TABLE)
     .select("normalized_query, raw_query, product, model, created_at, updated_at, expires_at, hit_count")
     .eq("normalized_query", normalizedQuery)
     .maybeSingle();
@@ -136,7 +150,7 @@ export async function upsertPricingCacheEntry(params: {
   const expiresAt = new Date(Date.now() + CACHE_TTL_MS).toISOString();
 
   const { data, error: upsertError } = await client
-    .from("onedaybaby_pricing_cache")
+    .from(PRICING_CACHE_TABLE)
     .upsert(
       {
         normalized_query: params.normalizedQuery,

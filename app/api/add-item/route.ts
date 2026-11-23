@@ -7,7 +7,7 @@ import {
   logAiRequest,
   sanitizeAnonymousId,
 } from "@/app/lib/ai-usage";
-import { createLogger } from "@/app/lib/logger";
+import { withRequestLogging } from "@/app/lib/request-logging";
 import { getPricingCacheEntry, type PricingCacheHit } from "@/app/lib/pricing-cache";
 import { isMeaningfulProductQuery, normalizeProductQuery } from "@/app/lib/product-query";
 import {
@@ -19,7 +19,6 @@ import {
 import type { PricingResult } from "@/app/lib/pricing-engine/base";
 import type { WishlistItem } from "@/types";
 
-const logger = createLogger("AddItemRoute");
 const GEMINI_PROMPT_DEBUG_ENABLED =
   process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_DEBUG_GEMINI_PROMPT === "1";
 
@@ -114,8 +113,7 @@ function isSuccessfulPricingResult(result: PricingResult | null): result is Extr
   return Boolean(result && "product" in result);
 }
 
-export async function POST(request: NextRequest) {
-  const requestId = crypto.randomUUID();
+async function addItem(request: NextRequest) {
   const startedAt = Date.now();
   const provider = getConfiguredPricingProvider();
   const model = getConfiguredPricingModel(provider);
@@ -128,12 +126,6 @@ export async function POST(request: NextRequest) {
     anonymousId = sanitizeAnonymousId(body.anonymousId);
     normalizedQuery = normalizeProductQuery(query);
     const ipHash = hashIpAddress(getRequestIp(request));
-
-    logger.info("Received add-item request", {
-      normalizedQuery,
-      provider,
-      requestId,
-    });
 
     if (!query || !isMeaningfulProductQuery(normalizedQuery)) {
       await writeRequestLog({
@@ -285,12 +277,6 @@ export async function POST(request: NextRequest) {
       cacheMode: "write-only",
     });
 
-    logger.debug("Resolving product pricing", {
-      normalizedQuery,
-      provider,
-      requestId,
-    });
-
     const result = await pricingEngine.resolveProductPricing(query);
 
     if (!isSuccessfulPricingResult(result)) {
@@ -360,16 +346,6 @@ export async function POST(request: NextRequest) {
           : new Date().toISOString(),
     });
 
-    logger.info("Successfully added item", {
-      productName: result.product.displayName,
-      normalizedQuery: result.normalizedQuery,
-      source: result.source,
-      provider,
-      model: result.model,
-      cacheAgeSeconds: result.cacheAgeSeconds,
-      requestId,
-    });
-
     await writeRequestLog({
       anonymousId,
       provider,
@@ -387,13 +363,7 @@ export async function POST(request: NextRequest) {
       meta,
       ...(GEMINI_PROMPT_DEBUG_ENABLED && result.prompt ? { prompt: result.prompt } : {}),
     });
-  } catch (err) {
-    logger.error(
-      "add-item API error",
-      err instanceof Error ? err : new Error(String(err)),
-      { requestId }
-    );
-
+  } catch {
     await writeRequestLog({
       anonymousId,
       provider,
@@ -413,3 +383,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const POST = withRequestLogging("/api/add-item", addItem);

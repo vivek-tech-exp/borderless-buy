@@ -61,7 +61,7 @@ export class Logger {
    * Log at error level
    */
   error(message: string, err?: Error | string, data?: Record<string, unknown>) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
+    const errorMsg = err instanceof Error ? err.message : err;
     this.log("error", message, data, errorMsg);
   }
 
