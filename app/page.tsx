@@ -12,7 +12,7 @@ import { ViewModeToggle, type ViewMode } from "@/app/components/view-mode-toggle
 import { MarketItemsList } from "@/app/components/market-items-list";
 import { Input } from "@/app/components/ui/input";
 import { useCurrency } from "@/app/lib/currency-context";
-import { isSupabaseConfigured, supabase } from "@/app/lib/supabase";
+import { confirmMagicLinkSignIn, isSupabaseConfigured, supabase } from "@/app/lib/supabase";
 import { SignInModal } from "@/app/components/sign-in-modal";
 import { buildMarketSummary, type MarketSummary } from "@/app/lib/market-summary";
 import {
@@ -194,6 +194,7 @@ function useWishlistAuthSync(params: {
       if (!mounted) return;
       setUser(session?.user ?? null);
       if (!session?.access_token) return;
+      confirmMagicLinkSignIn(session.access_token);
       await syncWishlistFromServer(session.access_token);
     }
 

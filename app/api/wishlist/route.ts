@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import type { WishlistItem } from "@/types";
+import { withRequestLogging } from "@/app/lib/request-logging";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
 const SUPABASE_ANON_KEY =
@@ -79,7 +80,7 @@ function makeAdminClient() {
   });
 }
 
-export async function GET(request: NextRequest) {
+async function getWishlist(request: NextRequest) {
   const auth = await getAuthorizedUserId(request);
   if ("response" in auth) return auth.response;
 
@@ -92,7 +93,6 @@ export async function GET(request: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("GET /api/wishlist error:", error.message);
       return errorResponse(error.message, 500);
     }
 
@@ -105,13 +105,12 @@ export async function GET(request: NextRequest) {
     }));
 
     return NextResponse.json({ items });
-  } catch (error) {
-    console.error("GET /api/wishlist exception:", error);
+  } catch {
     return errorResponse("Internal server error", 500);
   }
 }
 
-export async function POST(request: NextRequest) {
+async function createWishlistItem(request: NextRequest) {
   const auth = await getAuthorizedUserId(request);
   if ("response" in auth) return auth.response;
 
@@ -133,18 +132,16 @@ export async function POST(request: NextRequest) {
     ]);
 
     if (error) {
-      console.error("POST /api/wishlist error:", error.message);
       return errorResponse(error.message, 500);
     }
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("POST /api/wishlist exception:", error);
+  } catch {
     return errorResponse("Internal server error", 500);
   }
 }
 
-export async function DELETE(request: NextRequest) {
+async function deleteWishlistItem(request: NextRequest) {
   const auth = await getAuthorizedUserId(request);
   if ("response" in auth) return auth.response;
 
@@ -173,18 +170,16 @@ export async function DELETE(request: NextRequest) {
       .eq("user_id", auth.userId);
 
     if (error) {
-      console.error("DELETE /api/wishlist error:", error.message);
       return errorResponse(error.message, 500);
     }
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("DELETE /api/wishlist exception:", error);
+  } catch {
     return errorResponse("Internal server error", 500);
   }
 }
 
-export async function PATCH(request: NextRequest) {
+async function updateWishlistItem(request: NextRequest) {
   const auth = await getAuthorizedUserId(request);
   if ("response" in auth) return auth.response;
 
@@ -203,13 +198,16 @@ export async function PATCH(request: NextRequest) {
       .eq("user_id", auth.userId);
 
     if (error) {
-      console.error("PATCH /api/wishlist error:", error.message);
       return errorResponse(error.message, 500);
     }
 
     return NextResponse.json({ ok: true });
-  } catch (error) {
-    console.error("PATCH /api/wishlist exception:", error);
+  } catch {
     return errorResponse("Internal server error", 500);
   }
 }
+
+export const GET = withRequestLogging("/api/wishlist", getWishlist);
+export const POST = withRequestLogging("/api/wishlist", createWishlistItem);
+export const DELETE = withRequestLogging("/api/wishlist", deleteWishlistItem);
+export const PATCH = withRequestLogging("/api/wishlist", updateWishlistItem);
